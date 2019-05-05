@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 
     Block *block = (Block *)getNewBlockInBuffer(buffer);
 
-    block->R_data[0].A = 0;
+    
 
     return 0;
 }
