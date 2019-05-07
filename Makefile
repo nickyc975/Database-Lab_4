@@ -1,10 +1,12 @@
 vpath lib% lib
 vpath % src
 
-objects = libbptree.o libextmem.o libsort.o common.o main.o
+OUTPUT_DIR = out
+OBJECTS = libbptree.o libextmem.o libsort.o common.o main.o
 
-main: $(objects)
-	cc -o main $(objects)
+main: $(OBJECTS)
+	$(if $(shell ls | grep -w $(OUTPUT_DIR)), , $(shell mkdir $(OUTPUT_DIR)))
+	cc -o $(OUTPUT_DIR)/main $(OBJECTS)
 
 libbptree.o: libbptree.h
 
@@ -17,4 +19,4 @@ common.o: common.h
 main.o: common.h
 
 clean:
-	rm main $(objects) *.blk
+	rm -rf $(OUTPUT_DIR)/* $(OBJECTS) *.blk

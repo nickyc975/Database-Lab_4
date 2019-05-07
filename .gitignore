@@ -1,5 +1,7 @@
 # dirs
 ipch/
+out/
 
 # files
 *.blk
+*.o
