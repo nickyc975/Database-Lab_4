@@ -8,6 +8,8 @@
 #ifndef EXTMEM_H
 #define EXTMEM_H
 
+#include <stdlib.h>
+
 #define BLOCK_AVAILABLE 0
 #define BLOCK_UNAVAILABLE 1
 

@@ -3,6 +3,8 @@
 
 #include "inttypes.h"
 
+#define TUPLES_PER_BLK 7
+
 typedef struct R_struct
 {
     int A;
@@ -19,8 +21,8 @@ typedef struct Block_struct
 {
     union
     {
-        S S_data[7];
-        R R_data[7];
+        S S_data[TUPLES_PER_BLK];
+        R R_data[TUPLES_PER_BLK];
     };
 
     uint64_t next_blk;
