@@ -19,4 +19,4 @@ common.o: common.h
 main.o: common.h
 
 clean:
-	rm -rf $(OUTPUT_DIR)/* $(OBJECTS) *.blk
+	rm -rf $(OUTPUT_DIR)/* *.o

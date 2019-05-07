@@ -1,24 +1,65 @@
 #include "common.h"
 #include "../lib/libextmem.h"
 
+#define R_BLK_NUM 16
+#define S_BLK_NUM 32
+#define R_ADDR_PREFIX 'R' * 100
+#define S_ADDR_PREFIX 'S' * 100
+
+int gen_blocks(Buffer *buffer);
+
 int main(int argc, char *argv[])
 {
     Buffer _buffer;
     Buffer *buffer = &_buffer;
     initBuffer(520, 64, buffer);
 
+    gen_blocks(buffer);
+
+    return 0;
+}
+
+int gen_blocks(Buffer *buffer)
+{
     Block *block = (Block *)getNewBlockInBuffer(buffer);
 
-    for (int blk_num = 0; blk_num < 16; blk_num++)
+    for (int blk_num = 0; blk_num < R_BLK_NUM; blk_num++)
     {
         for (int i = 0; i < TUPLES_PER_BLK; i++)
         {
             gen_R(&(block->R_data[i]));
         }
-        block->next_blk = blk_num + 1;
-        writeBlockToDisk((char *)block, blk_num, buffer);
+
+        if (blk_num < R_BLK_NUM - 1)
+        {
+            block->next_blk = blk_num + 1;
+        }
+        else
+        {
+            block->next_blk = 0;
+        }   
+
+        writeBlockToDisk((char *)block, R_ADDR_PREFIX + blk_num, buffer);
         block = (Block *)getNewBlockInBuffer(buffer);
     }
 
-    return 0;
+    for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
+    {
+        for (int i = 0; i < TUPLES_PER_BLK; i++)
+        {
+            gen_S(&(block->S_data[i]));
+        }
+
+        if (blk_num < S_BLK_NUM - 1)
+        {
+            block->next_blk = blk_num + 1;
+        }
+        else
+        {
+            block->next_blk = 0;
+        }   
+
+        writeBlockToDisk((char *)block, S_ADDR_PREFIX + blk_num, buffer);
+        block = (Block *)getNewBlockInBuffer(buffer);
+    }
 }
