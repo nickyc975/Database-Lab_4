@@ -1,8 +1,6 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include "inttypes.h"
-
 #define TUPLES_PER_BLK 7
 
 typedef struct R_struct
@@ -25,7 +23,8 @@ typedef struct Block_struct
         R R_data[TUPLES_PER_BLK];
     };
 
-    uint64_t next_blk;
+    unsigned int unused;
+    unsigned int next_blk;
 } Block;
 
 void gen_R(R *r);
