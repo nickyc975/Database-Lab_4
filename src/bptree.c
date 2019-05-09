@@ -21,18 +21,9 @@ typedef struct node_struct
     unsigned char type;
     unsigned char overflowed;
     unsigned short valid_length;
-    
+
     int keys[MAX_VALID_LEN];
-    union
-    {
-        addr_t addrs[MAX_VALID_LEN + 1];
-        
-        struct
-        {
-            int values[MAX_VALID_LEN];
-            addr_t next_node;
-        };
-    };
+    addr_t addrs[MAX_VALID_LEN + 1];
 } node_t;
 
 struct bptree_struct 
@@ -140,24 +131,24 @@ node_t *_bptree_query(bptree_t *bptree, int key, stack_t *addr_stk)
     return node;
 }
 
-void _insert_into_node(node_t *node, int key, int value)
+void _insert_into_node(node_t *node, int key, addr_t addr)
 {
-    int temp_key = key, temp_value = value;
+    int temp_key = key, temp_addr = addr;
     if (node && node->type == LEAF)
     {
         for (int i = 0; i < node->valid_length; i++)
         {
             if (node->keys[i] > temp_key) {
-                temp_key += node->keys[i];
-                temp_value += node->values[i];
-                node->keys[i] = temp_key - node->keys[i];
-                node->values[i] = temp_value - node->values[i];
-                temp_key -= node->keys[i];
-                temp_value -= node->values[i];
+                temp_key ^= node->keys[i];
+                temp_addr ^= node->addrs[i];
+                node->keys[i] = temp_key ^ node->keys[i];
+                node->addrs[i] = temp_addr ^ node->addrs[i];
+                temp_key ^= node->keys[i];
+                temp_addr ^= node->addrs[i];
             }
         }
         node->keys[node->valid_length] = temp_key;
-        node->values[node->valid_length] = temp_value;
+        node->addrs[node->valid_length] = temp_addr;
         node->valid_length++;
     }
 }
@@ -174,22 +165,24 @@ void bptree_init(bptree_t *bptree, Buffer *buffer)
     if (bptree->root == NULL)
     {
         bptree->root = (node_t *)getNewBlockInBuffer(bptree->buffer);
+        bptree->root->type = LEAF;
+        bptree->root->overflowed = 0;
+        bptree->root->valid_length = 0;
     }
 }
 
-void bptree_insert(bptree_t *bptree, int key, int value)
+void bptree_insert(bptree_t *bptree, int key, addr_t addr)
 {
     stack_t *addr_stk = new_stk();
     node_t *node = _bptree_query(bptree, key, addr_stk);
     addr_t node_addr = stk_top(addr_stk);
     
-    _insert_into_node(node, key, value);
+    _insert_into_node(node, key, addr);
     if (node->valid_length >= MAX_VALID_LEN)
     {
         _bptree_split(node, addr_stk);
     }
     writeBlockToDisk((unsigned char *)node, node_addr, bptree->buffer);
-    freeBlockInBuffer((unsigned char *)node, bptree->buffer);
     free_stk(addr_stk);
 }
 

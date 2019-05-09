@@ -8,7 +8,7 @@ typedef struct bptree_struct bptree_t;
 
 void bptree_init(bptree_t *bptree, Buffer *buffer);
 
-void bptree_insert(bptree_t *bptree, int key, int value);
+void bptree_insert(bptree_t *bptree, int key, addr_t addr);
 
 void bptree_delete(bptree_t *bptree, int key);
 
