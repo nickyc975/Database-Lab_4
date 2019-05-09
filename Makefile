@@ -17,4 +17,4 @@ bptree.o: bptree.h
 main.o: common.h
 
 clean:
-	rm -rf $(OUTPUT_DIR)/* *.o
+	rm -rf $(OUTPUT_DIR)/* *.o *.blk

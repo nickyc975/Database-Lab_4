@@ -1,4 +1,7 @@
+#include <stdio.h>
+
 #include "common.h"
+#include "bptree.h"
 #include "../lib/libextmem.h"
 
 #define R_BLK_NUM 16

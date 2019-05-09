@@ -13,6 +13,8 @@
 #define BLOCK_AVAILABLE 0
 #define BLOCK_UNAVAILABLE 1
 
+typedef unsigned int addr_t;
+
 typedef struct tagBuffer {
     unsigned long numIO; /* Number of IO's*/
     size_t bufSize; /* Buffer size*/
@@ -41,12 +43,12 @@ unsigned char *getNewBlockInBuffer(Buffer *buf);
 void freeBlockInBuffer(unsigned char *blk, Buffer *buf);
 
 /* Drop a block on the disk */
-int dropBlockOnDisk(unsigned int addr);
+int dropBlockOnDisk(addr_t addr);
 
 /* Read a block from the hard disk to the buffer by the address of the block. */
-unsigned char *readBlockFromDisk(unsigned int addr, Buffer *buf);
+unsigned char *readBlockFromDisk(addr_t addr, Buffer *buf);
 
 /* Read a block in the buffer to the hard disk by the address of the block. */
-int writeBlockToDisk(unsigned char *blkPtr, unsigned int addr, Buffer *buf);
+int writeBlockToDisk(unsigned char *blkPtr, addr_t addr, Buffer *buf);
 
 #endif // EXTMEM_H

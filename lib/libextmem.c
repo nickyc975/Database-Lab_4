@@ -66,7 +66,7 @@ void freeBlockInBuffer(unsigned char *blk, Buffer *buf)
     buf->numFreeBlk++;
 }
 
-int dropBlockOnDisk(unsigned int addr)
+int dropBlockOnDisk(addr_t addr)
 {
     char filename[40];
 
@@ -81,7 +81,7 @@ int dropBlockOnDisk(unsigned int addr)
     return 0;
 }
 
-unsigned char *readBlockFromDisk(unsigned int addr, Buffer *buf)
+unsigned char *readBlockFromDisk(addr_t addr, Buffer *buf)
 {
     char filename[40];
     unsigned char *blkPtr, *bytePtr;
@@ -129,7 +129,7 @@ unsigned char *readBlockFromDisk(unsigned int addr, Buffer *buf)
     return blkPtr;
 }
 
-int writeBlockToDisk(unsigned char *blkPtr, unsigned int addr, Buffer *buf)
+int writeBlockToDisk(unsigned char *blkPtr, addr_t addr, Buffer *buf)
 {
     char filename[40];
     unsigned char *bytePtr;
