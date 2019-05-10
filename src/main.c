@@ -9,7 +9,7 @@
 #define R_ADDR_PREFIX 'R' * 100
 #define S_ADDR_PREFIX 'S' * 100
 
-int gen_blocks(Buffer *buffer);
+int gen_blocks(Buffer *buffer, bptree_t *bptree);
 
 int main(int argc, char *argv[])
 {
@@ -17,20 +17,26 @@ int main(int argc, char *argv[])
     Buffer *buffer = &_buffer;
     initBuffer(520, 64, buffer);
 
-    gen_blocks(buffer);
+    bptree_t bptree;
+    bptree_init(&bptree, buffer);
+
+    gen_blocks(buffer, &bptree);
 
     return 0;
 }
 
-int gen_blocks(Buffer *buffer)
+int gen_blocks(Buffer *buffer, bptree_t *bptree)
 {
+    addr_t blk_addr;
     Block *block = (Block *)getNewBlockInBuffer(buffer);
 
     for (int blk_num = 0; blk_num < R_BLK_NUM; blk_num++)
     {
+        blk_addr = R_ADDR_PREFIX + blk_num;
         for (int i = 0; i < TUPLES_PER_BLK; i++)
         {
             gen_R(&(block->R_data[i]));
+            bptree_insert(bptree, block->R_data[i].A, blk_addr);
         }
 
         if (blk_num < R_BLK_NUM - 1)
@@ -40,9 +46,10 @@ int gen_blocks(Buffer *buffer)
         else
         {
             block->next_blk = 0;
-        }   
+        }
 
-        writeBlockToDisk((char *)block, R_ADDR_PREFIX + blk_num, buffer);
+        writeBlockToDisk((unsigned char *)block, blk_addr, buffer);
+        freeBlockInBuffer((unsigned char *)block, buffer);
         block = (Block *)getNewBlockInBuffer(buffer);
     }
 
@@ -60,9 +67,11 @@ int gen_blocks(Buffer *buffer)
         else
         {
             block->next_blk = 0;
-        }   
+        }
 
         writeBlockToDisk((char *)block, S_ADDR_PREFIX + blk_num, buffer);
+        freeBlockInBuffer((unsigned char *)block, buffer);
         block = (Block *)getNewBlockInBuffer(buffer);
     }
+    freeBlockInBuffer((unsigned char *)block, buffer);
 }

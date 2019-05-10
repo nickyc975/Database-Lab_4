@@ -4,7 +4,14 @@
 #include "common.h"
 #include "../lib/libextmem.h"
 
-typedef struct bptree_struct bptree_t;
+typedef struct node_struct node_t;
+
+typedef struct bptree_struct 
+{
+    node_t *root;
+    Buffer *buffer;
+    addr_t curr_addr;
+} bptree_t;
 
 void bptree_init(bptree_t *bptree, Buffer *buffer);
 

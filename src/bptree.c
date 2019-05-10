@@ -5,107 +5,30 @@
 #define INNER 0
 #define LEAF 1
 #define OVERFLOW 2
-#define MAX_VALID_LEN 7
+#define MAX_KEY_NUM 6
 #define ROOT_ADDR 0x696478
 
-#define STACK_BASE_SIZE 32
-
-typedef struct stack_struct {
-    size_t size;
-    size_t cursor;
-    addr_t *stk_space;
-} stack_t;
-
-typedef struct node_struct
+struct node_struct
 {
+    addr_t addr;
+    addr_t parent;
+
     unsigned char type;
     unsigned char overflowed;
-    unsigned short valid_length;
+    unsigned short key_num;
 
-    int keys[MAX_VALID_LEN];
-    addr_t addrs[MAX_VALID_LEN + 1];
-} node_t;
+    int keys[MAX_KEY_NUM];
+    union
+    {
+        addr_t children[MAX_KEY_NUM + 1];
 
-struct bptree_struct 
-{
-    node_t *root;
-    Buffer *buffer;
-    addr_t curr_addr;
+        struct
+        {
+            addr_t values[MAX_KEY_NUM];
+            addr_t next_node;
+        };
+    };
 };
-
-void stk_resize(stack_t *stack)
-{
-    long factor = 2;
-    addr_t *new_space;
-    long add_size = stack->size / factor;
-    while (add_size > 0)
-    {
-        new_space = (addr_t *)realloc(stack->stk_space, stack->size + add_size);
-        if (new_space != NULL)
-        {
-            stack->stk_space = new_space;
-            stack->size += add_size;
-            break;
-        }
-        factor++;
-        add_size = stack->size / factor;
-    }
-}
-
-stack_t *new_stk()
-{
-    stack_t *stack = (stack_t *)malloc(sizeof(stack_t));
-    stack->stk_space = (addr_t *)malloc(sizeof(addr_t) * STACK_BASE_SIZE);
-    stack->cursor = 0;
-    stack->size = STACK_BASE_SIZE;
-    return stack;
-}
-
-int stk_isempty(stack_t *stack)
-{
-    return stack->cursor <= 0;
-}
-
-addr_t stk_top(stack_t *stack)
-{
-    size_t idx = stack->cursor;
-    if (idx > 0)
-    {
-        idx--;
-    }
-    return stack->stk_space[idx];
-}
-
-addr_t stk_pop(stack_t *stack)
-{
-    if (stack->cursor > 0)
-    {
-        stack->cursor--;
-    }
-    return stack->stk_space[stack->cursor];
-}
-
-void stk_push(stack_t *stack, addr_t item)
-{
-    stack->stk_space[stack->cursor] = item;
-    stack->cursor++;
-    if(stack->cursor >= stack->size)
-    {
-        stk_resize(stack);
-    }
-}
-
-void free_stk(stack_t *stack)
-{
-    if (stack != NULL)
-    {
-        if (stack->stk_space != NULL)
-        {
-            free(stack->stk_space);
-        }
-        free(stack);
-    }
-}
 
 addr_t _bptree_next_addr(bptree_t *bptree)
 {
@@ -113,146 +36,264 @@ addr_t _bptree_next_addr(bptree_t *bptree)
     return bptree->curr_addr;
 }
 
-node_t *_bptree_query(bptree_t *bptree, int key, stack_t *addr_stk)
+node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
+{
+    node_t *node = (node_t *)getNewBlockInBuffer(bptree->buffer);
+    node->overflowed = 0;
+    node->key_num = 0;
+    node->addr = addr ? addr : _bptree_next_addr(bptree);
+    node->parent = parent;
+    return node;
+}
+
+node_t *_new_inner_node(bptree_t *bptree, addr_t addr, addr_t parent)
+{
+    node_t *node = _new_node(bptree, addr, parent);
+    node->type = INNER;
+    return node;
+}
+
+node_t *_new_leaf_node(bptree_t *bptree, addr_t addr, addr_t parent)
+{
+    node_t *node = _new_node(bptree, addr, parent);
+    node->type = LEAF;
+    return node;
+}
+
+node_t *_new_overflow_node(bptree_t *bptree, addr_t addr, addr_t parent)
+{
+    node_t *node = _new_node(bptree, addr, parent);
+    node->type = OVERFLOW;
+    return node;
+}
+
+node_t *_read_node(bptree_t *bptree, addr_t addr)
+{
+    return (node_t *)readBlockFromDisk(addr, bptree->buffer);
+}
+
+int _save_node(bptree_t *bptree, node_t *node)
+{
+    return writeBlockToDisk((unsigned char *)node, node->addr, bptree->buffer);
+}
+
+void _free_node(bptree_t *bptree, node_t *node)
+{
+    freeBlockInBuffer((unsigned char *)node, bptree->buffer);
+}
+
+node_t *_bptree_query(bptree_t *bptree, int key)
 {
     addr_t next_addr;
     node_t *node = bptree->root;
 
     while(node && node->type == INNER)
     {
-        next_addr = node->addrs[0];
-        for (int i = 0; i < node->valid_length; i++)
+        next_addr = node->children[0];
+        for (int i = 0; i < node->key_num; i++)
         {
             if (key > node->keys[i])
             {
-                next_addr = node->addrs[i + 1];
+                next_addr = node->children[i + 1];
                 continue;
             }
             break;
         }
-        stk_push(addr_stk, next_addr);
-        freeBlockInBuffer((unsigned char *)node, bptree->buffer);
-        node = (node_t *)readBlockFromDisk(next_addr, bptree->buffer);
+        _free_node(bptree, node);
+        node = _read_node(bptree, next_addr);
     }
 
     return node;
 }
 
-void _insert_into_node(node_t *node, int key, addr_t addr)
+void _insert_into_inner(node_t *node, int key, addr_t child)
 {
-    int temp_key = key, temp_addr = addr;
-    if (node && node->type == LEAF)
+    int temp_key = key, temp_child = child;
+    if (node && node->type == INNER)
     {
-        for (int i = 0; i < node->valid_length; i++)
+        for (int i = 0; i < node->key_num; i++)
         {
             if (node->keys[i] > temp_key) {
                 temp_key ^= node->keys[i];
-                temp_addr ^= node->addrs[i];
+                temp_child ^= node->children[i + 1];
                 node->keys[i] = temp_key ^ node->keys[i];
-                node->addrs[i] = temp_addr ^ node->addrs[i];
+                node->children[i + 1] = temp_child ^ node->children[i + 1];
                 temp_key ^= node->keys[i];
-                temp_addr ^= node->addrs[i];
+                temp_child ^= node->children[i + 1];
             }
         }
-        node->keys[node->valid_length] = temp_key;
-        node->addrs[node->valid_length] = temp_addr;
-        node->valid_length++;
+        node->keys[node->key_num] = temp_key;
+        node->children[node->key_num + 1] = temp_child;
+        node->key_num++;
+    }
+}
+
+void _insert_into_leaf(node_t *node, int key, addr_t value)
+{
+    int temp_key = key, temp_value = value;
+    if (node && node->type == LEAF)
+    {
+        for (int i = 0; i < node->key_num; i++)
+        {
+            if (node->keys[i] > temp_key) {
+                temp_key ^= node->keys[i];
+                temp_value ^= node->values[i];
+                node->keys[i] = temp_key ^ node->keys[i];
+                node->values[i] = temp_value ^ node->values[i];
+                temp_key ^= node->keys[i];
+                temp_value ^= node->values[i];
+            }
+        }
+        node->keys[node->key_num] = temp_key;
+        node->values[node->key_num] = temp_value;
+        node->key_num++;
     }
 }
 
 void _copy_node(node_t *src, node_t *dest, unsigned int start)
 {
     unsigned int cursor = start;
-    while(cursor < src->valid_length && dest->valid_length < MAX_VALID_LEN)
+    while(cursor < src->key_num && dest->key_num < MAX_KEY_NUM)
     {
-        dest->keys[dest->valid_length] = src->keys[cursor];
-        dest->addrs[dest->valid_length] = src->addrs[cursor];
-        dest->valid_length++;
+        dest->keys[dest->key_num] = src->keys[cursor];
+        dest->children[dest->key_num] = src->children[cursor];
+        dest->key_num++;
         cursor++;
     }
 }
 
-void _bptree_split(bptree_t *bptree, node_t *node, stack_t *addr_stk)
+void _bptree_split_inner(bptree_t *bptree, node_t *node)
 {
-    node_t *new_node;
-    unsigned int spliter_idx = (node->valid_length + 1) / 2;
+    node_t *new_node, *parent;
+    unsigned int spliter_idx = (node->key_num + 1) / 2;
 
-    while(spliter_idx < node->valid_length && 
+    new_node = _new_inner_node(bptree, 0, 0);
+    _copy_node(node, new_node, spliter_idx);
+    new_node->children[new_node->key_num] = node->children[node->key_num];
+    node->key_num = spliter_idx;
+    _save_node(bptree, new_node);
+    _free_node(bptree, new_node);
+
+    if (node->parent)
+    {
+        parent = _read_node(bptree, node->parent);
+        _insert_into_inner(parent, node->keys[spliter_idx], new_node->addr);
+        if (parent->key_num >= MAX_KEY_NUM)
+        {
+            _bptree_split_inner(bptree, parent);
+        }
+        _save_node(bptree, parent);
+        _free_node(bptree, parent);
+    }
+    else
+    {
+        parent = _new_inner_node(bptree, ROOT_ADDR, 0);
+        _insert_into_inner(parent, node->keys[spliter_idx], new_node->addr);
+        node->addr = _bptree_next_addr(bptree);
+        parent->children[0] = node->addr;
+        node->parent = parent->addr;
+        bptree->root = parent;
+        _save_node(bptree, parent);
+    }
+}
+
+void _bptree_split_leaf(bptree_t *bptree, node_t *node)
+{
+    node_t *new_node, *parent;
+    unsigned int spliter_idx = (node->key_num + 1) / 2;
+
+    while(spliter_idx < node->key_num && 
         node->keys[spliter_idx - 1] == node->keys[spliter_idx])
     {
         spliter_idx++;
     }
     
-    unsigned int cursor = spliter_idx;
-    if (spliter_idx >= node->valid_length)
+    if (spliter_idx >= node->key_num)
     {
+        spliter_idx = (node->key_num + 1) / 2;
         if (node->overflowed)
         {
-            new_node = readBlockFromDisk(node->addrs[MAX_VALID_LEN], bptree->buffer);
-            _copy_node(node, new_node, cursor);
+            new_node = _read_node(bptree, node->next_node);
+            _copy_node(node, new_node, spliter_idx);
 
-            if (new_node->valid_length >= MAX_VALID_LEN)
+            if (new_node->key_num >= MAX_KEY_NUM)
             {
-                writeBlockToDisk((unsigned char *)new_node, node->addrs[MAX_VALID_LEN], bptree->buffer);
-                new_node = (node_t *)getNewBlockInBuffer(bptree->buffer);
-                new_node->type = OVERFLOW;
-                new_node->valid_length = 0;
-                new_node->addrs[MAX_VALID_LEN] = node->addrs[MAX_VALID_LEN];
-                node->addrs[MAX_VALID_LEN] = _bptree_next_addr(bptree);
+                _save_node(bptree, new_node);
+                _free_node(bptree, new_node);
+                new_node = _new_overflow_node(bptree, 0, 0);
+                new_node->next_node = node->next_node;
+                node->next_node = new_node->addr;
             }
         }
         else
         {
             node->overflowed = 1;
-            new_node = (node_t *)getNewBlockInBuffer(bptree->buffer);
-            new_node->type = OVERFLOW;
-            new_node->valid_length = 0;
-            new_node->addrs[MAX_VALID_LEN] = node->addrs[MAX_VALID_LEN];
-            node->addrs[MAX_VALID_LEN] = _bptree_next_addr(bptree);
+            new_node = _new_overflow_node(bptree, 0, 0);
+            new_node->next_node = node->next_node;
+            node->next_node = new_node->addr;
         }
     }
     else
     {
-        new_node->type = LEAF;
-        new_node->overflowed = 0;
-        new_node->valid_length = 0;
-        new_node->addrs[MAX_VALID_LEN] = node->addrs[MAX_VALID_LEN];
-        node->addrs[MAX_VALID_LEN] = _bptree_next_addr(bptree);
+        new_node = _new_leaf_node(bptree, 0, 0);
+        new_node->next_node = node->next_node;
+        node->next_node = new_node->addr;
+
+        if (node->parent)
+        {
+            parent = _read_node(bptree, node->parent);
+            _insert_into_inner(parent, node->keys[spliter_idx], node->next_node);
+            if (parent->key_num >= MAX_KEY_NUM)
+            {
+                _bptree_split_inner(bptree, parent);
+            }
+            _save_node(bptree, parent);
+            _free_node(bptree, parent);
+        }
+        else
+        {
+            parent = _new_inner_node(bptree, ROOT_ADDR, 0);
+            _insert_into_inner(parent, node->keys[spliter_idx], node->next_node);
+            node->addr = _bptree_next_addr(bptree);
+            parent->children[0] = node->addr;
+            node->parent = parent->addr;
+            bptree->root = parent;
+            _save_node(bptree, parent);
+        }
     }
     
-    _copy_node(node, new_node, cursor);
-    node->valid_length = spliter_idx;
-    writeBlockToDisk((unsigned char *)new_node, node->addrs[MAX_VALID_LEN], bptree->buffer);
-    
+    _copy_node(node, new_node, spliter_idx);
+    node->key_num = spliter_idx;
+    _save_node(bptree, new_node);
+    _free_node(bptree, new_node);
 }
 
 void bptree_init(bptree_t *bptree, Buffer *buffer)
 {
     bptree->buffer = buffer;
-    bptree->root = (node_t *)readBlockFromDisk(ROOT_ADDR, bptree->buffer);
+    bptree->root = _read_node(bptree, ROOT_ADDR);
     if (bptree->root == NULL)
     {
-        bptree->root = (node_t *)getNewBlockInBuffer(bptree->buffer);
-        bptree->root->type = LEAF;
-        bptree->root->overflowed = 0;
-        bptree->root->valid_length = 0;
+        bptree->root = _new_leaf_node(bptree, ROOT_ADDR, 0);
+        _save_node(bptree, bptree->root);
     }
     bptree->curr_addr = ROOT_ADDR;
 }
 
 void bptree_insert(bptree_t *bptree, int key, addr_t addr)
 {
-    stack_t *addr_stk = new_stk();
-    node_t *node = _bptree_query(bptree, key, addr_stk);
-    addr_t node_addr = stk_pop(addr_stk);
-    
-    _insert_into_node(node, key, addr);
-    if (node->valid_length >= MAX_VALID_LEN)
+    node_t *node = _bptree_query(bptree, key);
+    _insert_into_leaf(node, key, addr);
+
+    if (node->key_num >= MAX_KEY_NUM)
     {
-        _bptree_split(bptree, node, addr_stk);
+        _bptree_split_leaf(bptree, node);
     }
-    writeBlockToDisk((unsigned char *)node, node_addr, bptree->buffer);
-    free_stk(addr_stk);
+    _save_node(bptree, node);
+    if (node->addr != ROOT_ADDR)
+    {
+        _free_node(bptree, node);
+    }
 }
 
 void bptree_delete(bptree_t *bptree, int key)
