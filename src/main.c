@@ -1,3 +1,4 @@
+#include <time.h>
 #include <stdio.h>
 
 #include "common.h"
@@ -20,6 +21,7 @@ int main(int argc, char *argv[])
     bptree_t bptree;
     bptree_init(&bptree, buffer);
 
+    srand((unsigned int)time(NULL));
     gen_blocks(buffer, &bptree);
 
     return 0;
@@ -52,6 +54,8 @@ int gen_blocks(Buffer *buffer, bptree_t *bptree)
         freeBlockInBuffer((unsigned char *)block, buffer);
         block = (Block *)getNewBlockInBuffer(buffer);
     }
+
+    bptree_print(bptree);
 
     for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
     {

@@ -21,6 +21,8 @@ void bptree_delete(bptree_t *bptree, int key);
 
 void bptree_query(bptree_t *bptree, int key, addr_t base_addr);
 
+void bptree_print(bptree_t *bptree);
+
 void bptree_free(bptree_t *bptree);
 
 #endif
