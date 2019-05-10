@@ -147,8 +147,6 @@ int writeBlockToDisk(unsigned char *blkPtr, addr_t addr, Buffer *buf)
         fputc((int)(*bytePtr), fp);
 
     fclose(fp);
-    *(blkPtr - 1) = BLOCK_AVAILABLE;
-    buf->numFreeBlk++;
     buf->numIO++;
     return 0;
 }
