@@ -3,7 +3,17 @@
 
 #include "../lib/libextmem.h"
 
+#define MAX_VALUE_NUM 13
+
 typedef struct node_struct node_t;
+
+typedef struct data_blk_struct
+{
+    int value_num;
+    addr_t blk_addr;
+    addr_t next_blk_addr;
+    addr_t values[MAX_VALUE_NUM];
+} data_blk_t;
 
 typedef struct bptree_struct
 {
@@ -18,10 +28,14 @@ void bptree_insert(bptree_t *bptree, int key, addr_t value);
 
 void bptree_delete(bptree_t *bptree, int key);
 
-void bptree_query(bptree_t *bptree, int key, addr_t base_addr);
+addr_t bptree_query(bptree_t *bptree, int key);
 
 void bptree_print(bptree_t *bptree);
 
 void bptree_free(bptree_t *bptree);
+
+data_blk_t *read_data_blk(bptree_t *bptree, addr_t blk_addr);
+
+void free_data_blk(bptree_t *bptree, data_blk_t *data_blk);
 
 #endif

@@ -8,10 +8,8 @@
 #define LEAF 1
 
 #define MAX_KEY_NUM 6
-#define MAX_VALUE_NUM 13
 
 #define ROOT_ADDR 0x696478
-
 
 struct node_struct
 {
@@ -32,14 +30,6 @@ struct node_struct
     };
 };
 
-typedef struct data_blk_struct
-{
-    int value_num;
-    addr_t blk_addr;
-    addr_t next_blk_addr;
-    addr_t values[MAX_VALUE_NUM];
-} data_blk_t;
-
 int indent = 0;
 
 addr_t _next_addr(bptree_t *bptree);
@@ -53,9 +43,7 @@ int _save_node(bptree_t *bptree, node_t *node, int free_after_save);
 void _free_node(bptree_t *bptree, node_t *node);
 
 data_blk_t *_new_data_blk(bptree_t *bptree);
-data_blk_t *_read_data_blk(bptree_t *bptree, addr_t blk_addr);
 int _save_data_blk(bptree_t *bptree, data_blk_t *data_blk, int free_after_save);
-void _free_data_blk(bptree_t *bptree, data_blk_t *data_blk);
 
 node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk);
 
@@ -106,9 +94,23 @@ void bptree_delete(bptree_t *bptree, int key)
 
 }
 
-void bptree_query(bptree_t *bptree, int key, addr_t base_addr)
+addr_t bptree_query(bptree_t *bptree, int key)
 {
-
+    addr_t result = 0;
+    node_t *node = _query(bptree, key, NULL);
+    if (node != NULL)
+    {
+        for (int i = 0; i < node->key_num; i++)
+        {
+            if (node->keys[i] == key)
+            {
+                result = node->blk_addrs[i];
+                break;
+            }
+        }
+        _free_node(bptree, node);
+    }
+    return result;
 }
 
 void bptree_print(bptree_t *bptree)
@@ -142,6 +144,16 @@ void bptree_print(bptree_t *bptree)
 void bptree_free(bptree_t *bptree)
 {
 
+}
+
+data_blk_t *read_data_blk(bptree_t *bptree, addr_t blk_addr)
+{
+    return (data_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
+}
+
+void free_data_blk(bptree_t *bptree, data_blk_t *data_blk)
+{
+    freeBlockInBuffer((unsigned char *)data_blk, bptree->buffer);
 }
 
 addr_t _next_addr(bptree_t *bptree)
@@ -201,24 +213,14 @@ data_blk_t *_new_data_blk(bptree_t *bptree)
     return data_blk;
 }
 
-data_blk_t *_read_data_blk(bptree_t *bptree, addr_t blk_addr)
-{
-    return (data_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
-}
-
 int _save_data_blk(bptree_t *bptree, data_blk_t *data_blk, int free_after_save)
 {
     int result = writeBlockToDisk((unsigned char *)data_blk, data_blk->blk_addr, bptree->buffer);
     if (free_after_save)
     {
-        _free_data_blk(bptree, data_blk);
+        free_data_blk(bptree, data_blk);
     }
     return result;
-}
-
-void _free_data_blk(bptree_t *bptree, data_blk_t *data_blk)
-{
-    freeBlockInBuffer((unsigned char *)data_blk, bptree->buffer);
 }
 
 node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk)
@@ -226,7 +228,10 @@ node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk)
     addr_t next_addr;
     node_t *node = bptree->root;
 
-    stk_push(addr_stk, ROOT_ADDR);
+    if (addr_stk != NULL)
+    {
+        stk_push(addr_stk, ROOT_ADDR);
+    }
     while (node && node->type == INNER)
     {
         next_addr = node->children[0];
@@ -239,7 +244,10 @@ node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk)
             }
             break;
         }
-        stk_push(addr_stk, next_addr);
+        if (addr_stk != NULL)
+        {
+            stk_push(addr_stk, next_addr);
+        }
         _free_node(bptree, node);
         node = _read_node(bptree, next_addr);
     }
@@ -280,7 +288,7 @@ void _insert_into_leaf(bptree_t *bptree, node_t *node, int key, addr_t value)
         {
             if (node->keys[i] == temp_key)
             {
-                data_blk = _read_data_blk(bptree, node->blk_addrs[i]);
+                data_blk = read_data_blk(bptree, node->blk_addrs[i]);
                 data_blk->values[data_blk->value_num] = value;
                 data_blk->value_num++;
                 if (data_blk->value_num >= MAX_VALUE_NUM)
