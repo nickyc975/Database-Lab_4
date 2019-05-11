@@ -104,7 +104,6 @@ unsigned char *readBlockFromDisk(addr_t addr, Buffer *buf)
     }
 
     sprintf(filename, "%d.blk", addr);
-    printf("%d\n", addr);
     FILE *fp = fopen(filename, "rb");
 
     if (!fp)

@@ -57,20 +57,19 @@ node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
 node_t *_new_inner_node(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = _new_node(bptree, addr, parent);
-    node->type = INNER;
+    node->type = (unsigned short)INNER;
     return node;
 }
 
 node_t *_new_leaf_node(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = _new_node(bptree, addr, parent);
-    node->type = LEAF;
+    node->type = (unsigned short)LEAF;
     return node;
 }
 
 node_t *_read_node(bptree_t *bptree, addr_t addr)
 {
-    printf("reading node\n");
     return (node_t *)readBlockFromDisk(addr, bptree->buffer);
 }
 
@@ -95,7 +94,6 @@ data_blk_t *_new_data_blk(bptree_t *bptree)
 
 data_blk_t *_read_data_blk(bptree_t *bptree, addr_t blk_addr)
 {
-    printf("reading data blk\n");
     return (data_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
 }
 
@@ -187,6 +185,7 @@ void _insert_into_leaf(bptree_t *bptree, node_t *node, int key, addr_t value)
         }
 
         data_blk = _new_data_blk(bptree);
+
         data_blk->values[data_blk->value_num] = value;
         data_blk->value_num++;
         temp_blk_addr = data_blk->blk_addr;
@@ -243,12 +242,12 @@ void _bptree_split_inner(bptree_t *bptree, node_t *node)
     node_t *new_node, *parent;
     unsigned int spliter_idx = (node->key_num + 1) / 2;
 
+    printf("split inner with key: %d, key index: %d\n", node->keys[spliter_idx], spliter_idx);
+
     new_node = _new_inner_node(bptree, 0, 0);
     _copy_inner_node(node, new_node, spliter_idx);
     new_node->children[new_node->key_num] = node->children[node->key_num];
     node->key_num = spliter_idx;
-    _save_node(bptree, new_node);
-    _free_node(bptree, new_node);
 
     if (node->parent)
     {
@@ -271,20 +270,23 @@ void _bptree_split_inner(bptree_t *bptree, node_t *node)
         bptree->root = parent;
         _save_node(bptree, parent);
     }
+    new_node->parent = node->parent;
+    _save_node(bptree, new_node);
+    _free_node(bptree, new_node);
 }
 
 void _bptree_split_leaf(bptree_t *bptree, node_t *node)
 {
     node_t *new_node, *parent;
     unsigned int spliter_idx = (node->key_num + 1) / 2;
+
+    printf("split leaf with key: %d, key index: %d\n", node->keys[spliter_idx], spliter_idx);
     
     new_node = _new_leaf_node(bptree, 0, 0);
     new_node->next_node = node->next_node;
     node->next_node = new_node->addr;
     _copy_leaf_node(node, new_node, spliter_idx);
     node->key_num = spliter_idx;
-    _save_node(bptree, new_node);
-    _free_node(bptree, new_node);
 
     if (node->parent)
     {
@@ -307,6 +309,9 @@ void _bptree_split_leaf(bptree_t *bptree, node_t *node)
         bptree->root = parent;
         _save_node(bptree, parent);
     }
+    new_node->parent = node->parent;
+    _save_node(bptree, new_node);
+    _free_node(bptree, new_node);
 }
 
 void bptree_init(bptree_t *bptree, Buffer *buffer)
@@ -325,6 +330,8 @@ void bptree_insert(bptree_t *bptree, int key, addr_t addr)
 {
     node_t *node = _bptree_query(bptree, key);
     _insert_into_leaf(bptree, node, key, addr);
+
+    printf("insert key: %d, value: %d\n", key, addr);
 
     if (node->key_num >= MAX_KEY_NUM)
     {
