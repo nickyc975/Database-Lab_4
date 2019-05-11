@@ -6,18 +6,17 @@ OUTPUT_DIR = out
 CC = gcc
 CFLAGS = -g -Wall
 
-SRCS = libextmem.c bptree.c common.c join.c project.c select.c main.c
+SRCS = libextmem.c stack.c bptree.c database.c main.c
 OBJECTS = $(SRCS:.c=.o)
 
 main: $(OBJECTS)
 	$(if $(shell ls | grep -w $(OUTPUT_DIR)), , $(shell mkdir $(OUTPUT_DIR)))
-	$(CC) $(CFLAGS) -o $(OUTPUT_DIR)/main $(OBJECTS)
+	$(CC) $(CFLAGS) $(foreach obj, $(OBJECTS), $(OUTPUT_DIR)/$(obj)) -o $(OUTPUT_DIR)/main
 
-.c.o:
-	$(CC) $(CFLAGS) -c $< -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $(OUTPUT_DIR)/$@
 
 test: clean main
-	cd $(OUTPUT_DIR)
 	$(OUTPUT_DIR)/main
 
 clean:

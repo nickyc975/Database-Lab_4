@@ -1,8 +1,8 @@
 #include <time.h>
 #include <stdio.h>
 
-#include "common.h"
 #include "bptree.h"
+#include "database.h"
 #include "../lib/libextmem.h"
 
 #define R_BLK_NUM 16
@@ -27,6 +27,18 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+void gen_R(R *r)
+{
+    r->A = rand() % 40 + 1;
+    r->B = rand() % 1000 + 1;
+}
+
+void gen_S(S *s)
+{
+    s->C = rand() % 40 + 21;
+    s->D = rand() % 1000 + 1;
+}
+
 int gen_blocks(Buffer *buffer, bptree_t *bptree)
 {
     addr_t blk_addr;
@@ -37,8 +49,8 @@ int gen_blocks(Buffer *buffer, bptree_t *bptree)
         blk_addr = R_ADDR_PREFIX + blk_num;
         for (int i = 0; i < TUPLES_PER_BLK; i++)
         {
-            gen_R(&(block->R_data[i]));
-            bptree_insert(bptree, block->R_data[i].A, blk_addr);
+            gen_R(&(block->R_tuples[i]));
+            bptree_insert(bptree, block->R_tuples[i].A, blk_addr);
         }
 
         if (blk_num < R_BLK_NUM - 1)
@@ -61,7 +73,7 @@ int gen_blocks(Buffer *buffer, bptree_t *bptree)
     {
         for (int i = 0; i < TUPLES_PER_BLK; i++)
         {
-            gen_S(&(block->S_data[i]));
+            gen_S(&(block->S_tuples[i]));
         }
 
         if (blk_num < S_BLK_NUM - 1)

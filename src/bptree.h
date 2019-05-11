@@ -1,12 +1,11 @@
 #ifndef BPTREE_H
 #define BPTREE_H
 
-#include "common.h"
 #include "../lib/libextmem.h"
 
 typedef struct node_struct node_t;
 
-typedef struct bptree_struct 
+typedef struct bptree_struct
 {
     node_t *root;
     Buffer *buffer;
