@@ -73,9 +73,10 @@ int gen_blocks(Buffer *buffer, bptree_t *bptree)
             block->next_blk = 0;
         }
 
-        writeBlockToDisk((char *)block, S_ADDR_PREFIX + blk_num, buffer);
+        writeBlockToDisk((unsigned char *)block, S_ADDR_PREFIX + blk_num, buffer);
         freeBlockInBuffer((unsigned char *)block, buffer);
         block = (Block *)getNewBlockInBuffer(buffer);
     }
     freeBlockInBuffer((unsigned char *)block, buffer);
+    return 0;
 }
