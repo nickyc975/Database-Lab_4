@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    {
+      "type": "shell",
+      "label": "clean",
+      "command": "make",
+      "args": [
+        "clean"
+      ],
+      "options": {
+        "cwd": "${workspaceRoot}"
+      }
+    },
+    {
+      "type": "shell",
+      "label": "make",
+      "command": "make",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceRoot}"
+      },
+      "dependsOn":[
+        "clean"
+      ]
+    }
+  ],
+  "version": "2.0.0"
+}

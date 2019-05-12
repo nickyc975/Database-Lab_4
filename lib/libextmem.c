@@ -60,8 +60,12 @@ unsigned char *getNewBlockInBuffer(Buffer *buf)
 
 void freeBlockInBuffer(unsigned char *blk, Buffer *buf)
 {
-    *(blk - 1) = BLOCK_AVAILABLE;
-    buf->numFreeBlk++;
+    unsigned char *flag_ptr = blk - 1;
+    if (*flag_ptr != BLOCK_AVAILABLE)
+    {
+        *flag_ptr = BLOCK_AVAILABLE;
+        buf->numFreeBlk++;
+    }
 }
 
 int dropBlockOnDisk(addr_t addr)

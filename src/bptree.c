@@ -1,24 +1,24 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "bptree.h"
 #include "stack.h"
 
-#define INNER 0
-#define LEAF 1
-
 #define MAX_KEY_NUM 6
 
-#define ROOT_ADDR 0x696478
+typedef enum
+{
+    INNER, LEAF
+} node_type;
 
 struct node_struct
 {
     addr_t addr;
-
-    unsigned int type;
+    node_type type;
     unsigned int key_num;
-
     int keys[MAX_KEY_NUM];
+
     union {
         addr_t children[MAX_KEY_NUM + 1];
 
@@ -59,16 +59,38 @@ void _split_leaf(bptree_t *bptree, node_t *node, stack_t *addr_stk);
 void _print_indent();
 void _print_node(bptree_t *bptree, addr_t addr);
 
-void bptree_init(bptree_t *bptree, Buffer *buffer)
+void bptree_init(bptree_t *bptree,bptree_meta_t *meta, Buffer *buffer)
 {
     bptree->buffer = buffer;
-    bptree->root = _read_node(bptree, ROOT_ADDR);
-    if (bptree->root == NULL)
+    bptree->last_alloc_addr = meta->last_alloc_addr;
+    bptree->root_node = _read_node(bptree, meta->root_addr);
+    if (bptree->root_node)
     {
-        bptree->root = _new_leaf(bptree, ROOT_ADDR, 0);
-        _save_node(bptree, bptree->root, 0);
+        if (meta->leftmost_addr == meta->root_addr)
+        {
+            bptree->leftmost_node = bptree->root_node;
+        }
+        else
+        {
+            bptree->leftmost_node = _read_node(bptree, meta->leftmost_addr);
+            if (!bptree->leftmost_node)
+            {
+                perror("Invalid leftmost node address!");
+                exit(1);
+            }
+        }
     }
-    bptree->curr_addr = ROOT_ADDR;
+    else if (meta->root_addr)
+    {
+        bptree->root_node = _new_leaf(bptree, meta->root_addr, 0);
+        bptree->leftmost_node = bptree->root_node;
+        _save_node(bptree, bptree->root_node, 0);
+    }
+    else
+    {
+        perror("Invalid root node address.");
+        exit(1);
+    }
 }
 
 void bptree_insert(bptree_t *bptree, int key, addr_t value)
@@ -82,7 +104,7 @@ void bptree_insert(bptree_t *bptree, int key, addr_t value)
         _split_leaf(bptree, node, addr_stk);
     }
     _save_node(bptree, node, 0);
-    if (node->addr != ROOT_ADDR)
+    if (node != bptree->root_node && node != bptree->leftmost_node)
     {
         _free_node(bptree, node);
     }
@@ -116,16 +138,9 @@ addr_t bptree_query(bptree_t *bptree, int key)
 void bptree_print(bptree_t *bptree)
 {
     addr_t next_addr;
-    node_t *node = bptree->root;
+    node_t *node = _read_node(bptree, bptree->leftmost_node->addr);
 
-    _print_node(bptree, bptree->root->addr);
-
-    while (node && node->type == INNER)
-    {
-        next_addr = node->children[0];
-        _free_node(bptree, node);
-        node = _read_node(bptree, next_addr);
-    }
+    _print_node(bptree, bptree->root_node->addr);
 
     while (node)
     {
@@ -141,9 +156,20 @@ void bptree_print(bptree_t *bptree)
     }
 }
 
-void bptree_free(bptree_t *bptree)
+void bptree_free(bptree_t *bptree, bptree_meta_t *meta)
 {
+    meta->last_alloc_addr = bptree->last_alloc_addr;
+    if (bptree->root_node)
+    {
+        meta->root_addr = bptree->root_node->addr;
+        _free_node(bptree, bptree->root_node);
+    }
 
+    if (bptree->leftmost_node)
+    {
+        meta->leftmost_addr = bptree->leftmost_node->addr;
+        _free_node(bptree, bptree->leftmost_node);
+    }
 }
 
 data_blk_t *read_data_blk(bptree_t *bptree, addr_t blk_addr)
@@ -158,8 +184,8 @@ void free_data_blk(bptree_t *bptree, data_blk_t *data_blk)
 
 addr_t _next_addr(bptree_t *bptree)
 {
-    bptree->curr_addr += sizeof(node_t);
-    return bptree->curr_addr;
+    bptree->last_alloc_addr += sizeof(node_t);
+    return bptree->last_alloc_addr;
 }
 
 node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
@@ -226,11 +252,11 @@ int _save_data_blk(bptree_t *bptree, data_blk_t *data_blk, int free_after_save)
 node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk)
 {
     addr_t next_addr;
-    node_t *node = bptree->root;
+    node_t *node = _read_node(bptree, bptree->root_node->addr);
 
     if (addr_stk != NULL)
     {
-        stk_push(addr_stk, ROOT_ADDR);
+        stk_push(addr_stk, bptree->root_node->addr);
     }
     while (node && node->type == INNER)
     {
@@ -250,6 +276,12 @@ node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk)
         }
         _free_node(bptree, node);
         node = _read_node(bptree, next_addr);
+    }
+
+    if (node->addr == bptree->leftmost_node->addr)
+    {
+        _free_node(bptree, node);
+        node = bptree->leftmost_node;
     }
 
     return node;
@@ -377,10 +409,10 @@ void _split_inner(bptree_t *bptree, stack_t *addr_stk)
     }
     else
     {
-        parent = _new_inner(bptree, ROOT_ADDR, 0);
+        parent = _new_inner(bptree, node->addr, 0);
         node->addr = _next_addr(bptree);
         parent->children[0] = node->addr;
-        bptree->root = parent;
+        bptree->root_node = parent;
     }
     _insert_into_inner(parent, new_node->keys[0], new_node->addr);
     unsigned int key_num = parent->key_num;
@@ -388,7 +420,7 @@ void _split_inner(bptree_t *bptree, stack_t *addr_stk)
     _save_node(bptree, parent, 0);
     _save_node(bptree, node, 1);
 
-    if (parent->addr != ROOT_ADDR)
+    if (parent != bptree->root_node)
     {
         _free_node(bptree, parent);
     }
@@ -417,17 +449,17 @@ void _split_leaf(bptree_t *bptree, node_t *node, stack_t *addr_stk)
     }
     else
     {
-        parent = _new_inner(bptree, ROOT_ADDR, 0);
+        parent = _new_inner(bptree, node->addr, 0);
         node->addr = _next_addr(bptree);
         parent->children[0] = node->addr;
-        bptree->root = parent;
+        bptree->root_node = parent;
     }
     _insert_into_inner(parent, new_node->keys[0], new_node->addr);
     unsigned int key_num = parent->key_num;
     _save_node(bptree, new_node, 1);
     _save_node(bptree, parent, 0);
 
-    if (parent->addr != ROOT_ADDR)
+    if (parent != bptree->root_node)
     {
         _free_node(bptree, parent);
     }

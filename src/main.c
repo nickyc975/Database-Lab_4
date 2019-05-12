@@ -7,10 +7,12 @@
 
 #define R_BLK_NUM 16
 #define S_BLK_NUM 32
-#define R_ADDR_PREFIX 'R' * 100
-#define S_ADDR_PREFIX 'S' * 100
+#define R_ADDR_PREFIX 0x520000
+#define S_ADDR_PREFIX 0x530000
+#define R_BPTREE_ROOT_ADDR 0x52000000
+#define S_BPTREE_ROOT_ADDR 0x53000000
 
-int gen_blocks(Buffer *buffer, bptree_t *bptree);
+int gen_blocks(Buffer *buffer);
 
 int main(int argc, char *argv[])
 {
@@ -18,29 +20,25 @@ int main(int argc, char *argv[])
     Buffer *buffer = &_buffer;
     initBuffer(520, 64, buffer);
 
-    bptree_t bptree;
-    bptree_init(&bptree, buffer);
-
     srand((unsigned int)time(NULL));
 
     printf("io num: %ld\n", buffer->numIO);
-    gen_blocks(buffer, &bptree);
-
-    data_blk_t *data_blk;
-
+    gen_blocks(buffer);
     printf("io num: %ld\n", buffer->numIO);
-    addr_t blk_addr = bptree_query(&bptree, 40);
-    while(blk_addr)
-    {
-        data_blk = read_data_blk(&bptree, blk_addr);
-        for (int i = 0; i < data_blk->value_num; i++)
-        {
-            printf("%d\t", data_blk->values[i]);
-        }
-        blk_addr = data_blk->next_blk_addr;
-        free_data_blk(&bptree, data_blk);
-    }
-    printf("\nio num: %ld\n", buffer->numIO);
+
+    // data_blk_t *data_blk;
+    // addr_t blk_addr = bptree_query(&bptree, 40);
+    // while(blk_addr)
+    // {
+    //     data_blk = read_data_blk(&bptree, blk_addr);
+    //     for (int i = 0; i < data_blk->value_num; i++)
+    //     {
+    //         printf("%d\t", data_blk->values[i]);
+    //     }
+    //     blk_addr = data_blk->next_blk_addr;
+    //     free_data_blk(&bptree, data_blk);
+    // }
+    // printf("\nio num: %ld\n", buffer->numIO);
     return 0;
 }
 
@@ -56,10 +54,17 @@ void gen_S(S *s)
     s->D = rand() % 1000 + 1;
 }
 
-int gen_blocks(Buffer *buffer, bptree_t *bptree)
+int gen_blocks(Buffer *buffer)
 {
     addr_t blk_addr;
+    bptree_t R_bptree, S_bptree;
+    bptree_meta_t R_meta, S_meta;
     Block *block = (Block *)getNewBlockInBuffer(buffer);
+
+    R_meta.root_addr = R_BPTREE_ROOT_ADDR;
+    R_meta.leftmost_addr = R_BPTREE_ROOT_ADDR;
+    R_meta.last_alloc_addr = R_BPTREE_ROOT_ADDR;
+    bptree_init(&R_bptree, &R_meta, buffer);
 
     for (int blk_num = 0; blk_num < R_BLK_NUM; blk_num++)
     {
@@ -68,7 +73,7 @@ int gen_blocks(Buffer *buffer, bptree_t *bptree)
         {
             gen_R(&(block->R_tuples[i]));
             printf("io num before insert: %ld\n", buffer->numIO);
-            bptree_insert(bptree, block->R_tuples[i].A, blk_addr);
+            bptree_insert(&R_bptree, block->R_tuples[i].A, blk_addr);
             printf("io num after insert: %ld\n", buffer->numIO);
         }
 
@@ -86,28 +91,38 @@ int gen_blocks(Buffer *buffer, bptree_t *bptree)
         block = (Block *)getNewBlockInBuffer(buffer);
     }
 
-    bptree_print(bptree);
+    bptree_print(&R_bptree);
+    bptree_free(&R_bptree, &R_meta);
 
-    for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
-    {
-        for (int i = 0; i < TUPLES_PER_BLK; i++)
-        {
-            gen_S(&(block->S_tuples[i]));
-        }
+    // S_meta.root_addr = S_BPTREE_ROOT_ADDR;
+    // S_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
+    // S_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
+    // bptree_init(&S_bptree, &S_meta, buffer);
 
-        if (blk_num < S_BLK_NUM - 1)
-        {
-            block->next_blk = blk_num + 1;
-        }
-        else
-        {
-            block->next_blk = 0;
-        }
+    // for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
+    // {
+    //     for (int i = 0; i < TUPLES_PER_BLK; i++)
+    //     {
+    //         gen_S(&(block->S_tuples[i]));
+    //         bptree_insert(&S_bptree, block->S_tuples[i].C, blk_addr);
+    //     }
 
-        writeBlockToDisk((unsigned char *)block, S_ADDR_PREFIX + blk_num, buffer);
-        freeBlockInBuffer((unsigned char *)block, buffer);
-        block = (Block *)getNewBlockInBuffer(buffer);
-    }
+    //     if (blk_num < S_BLK_NUM - 1)
+    //     {
+    //         block->next_blk = blk_num + 1;
+    //     }
+    //     else
+    //     {
+    //         block->next_blk = 0;
+    //     }
+
+    //     writeBlockToDisk((unsigned char *)block, S_ADDR_PREFIX + blk_num, buffer);
+    //     freeBlockInBuffer((unsigned char *)block, buffer);
+    //     block = (Block *)getNewBlockInBuffer(buffer);
+    // }
+
+    // bptree_print(&S_bptree);
+    // bptree_free(&S_bptree, &S_meta);
     freeBlockInBuffer((unsigned char *)block, buffer);
     return 0;
 }
