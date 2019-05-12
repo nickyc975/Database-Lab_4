@@ -72,9 +72,7 @@ int gen_blocks(Buffer *buffer)
         for (int i = 0; i < TUPLES_PER_BLK; i++)
         {
             gen_R(&(block->R_tuples[i]));
-            printf("io num before insert: %ld\n", buffer->numIO);
             bptree_insert(&R_bptree, block->R_tuples[i].A, blk_addr);
-            printf("io num after insert: %ld\n", buffer->numIO);
         }
 
         if (blk_num < R_BLK_NUM - 1)
@@ -94,35 +92,37 @@ int gen_blocks(Buffer *buffer)
     bptree_print(&R_bptree);
     bptree_free(&R_bptree, &R_meta);
 
-    // S_meta.root_addr = S_BPTREE_ROOT_ADDR;
-    // S_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
-    // S_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
-    // bptree_init(&S_bptree, &S_meta, buffer);
+    S_meta.root_addr = S_BPTREE_ROOT_ADDR;
+    S_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
+    S_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
+    bptree_init(&S_bptree, &S_meta, buffer);
+    for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
+    {
+        for (int i = 0; i < TUPLES_PER_BLK; i++)
+        {
+            gen_S(&(block->S_tuples[i]));
+            bptree_insert(&S_bptree, block->S_tuples[i].C, blk_addr);
+        }
 
-    // for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
-    // {
-    //     for (int i = 0; i < TUPLES_PER_BLK; i++)
-    //     {
-    //         gen_S(&(block->S_tuples[i]));
-    //         bptree_insert(&S_bptree, block->S_tuples[i].C, blk_addr);
-    //     }
+        if (blk_num < S_BLK_NUM - 1)
+        {
+            block->next_blk = blk_num + 1;
+        }
+        else
+        {
+            block->next_blk = 0;
+        }
 
-    //     if (blk_num < S_BLK_NUM - 1)
-    //     {
-    //         block->next_blk = blk_num + 1;
-    //     }
-    //     else
-    //     {
-    //         block->next_blk = 0;
-    //     }
+        writeBlockToDisk((unsigned char *)block, S_ADDR_PREFIX + blk_num, buffer);
+        freeBlockInBuffer((unsigned char *)block, buffer);
+        block = (Block *)getNewBlockInBuffer(buffer);
+    }
 
-    //     writeBlockToDisk((unsigned char *)block, S_ADDR_PREFIX + blk_num, buffer);
-    //     freeBlockInBuffer((unsigned char *)block, buffer);
-    //     block = (Block *)getNewBlockInBuffer(buffer);
-    // }
-
-    // bptree_print(&S_bptree);
-    // bptree_free(&S_bptree, &S_meta);
+    bptree_print(&S_bptree);
+    bptree_free(&S_bptree, &S_meta);
     freeBlockInBuffer((unsigned char *)block, buffer);
+
+    printf("numFreeBlk: %ld\n", buffer->numFreeBlk);
+
     return 0;
 }

@@ -137,10 +137,10 @@ addr_t bptree_query(bptree_t *bptree, int key)
 
 void bptree_print(bptree_t *bptree)
 {
+    _print_node(bptree, bptree->root_node->addr);
+
     addr_t next_addr;
     node_t *node = _read_node(bptree, bptree->leftmost_node->addr);
-
-    _print_node(bptree, bptree->root_node->addr);
 
     while (node)
     {
@@ -199,14 +199,15 @@ node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
 node_t *_new_inner(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = _new_node(bptree, addr, parent);
-    node->type = (unsigned short)INNER;
+    node->type = INNER;
     return node;
 }
 
 node_t *_new_leaf(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = _new_node(bptree, addr, parent);
-    node->type = (unsigned short)LEAF;
+    node->type = LEAF;
+    node->next_node = 0;
     return node;
 }
 
@@ -403,28 +404,27 @@ void _split_inner(bptree_t *bptree, stack_t *addr_stk)
     new_node->children[new_node->key_num] = node->children[node->key_num];
     node->key_num = spliter_idx;
 
+    unsigned int key_num = 0;
     if (!stk_isempty(addr_stk))
     {
         parent = _read_node(bptree, stk_top(addr_stk));
+        _insert_into_inner(parent, new_node->keys[0], new_node->addr);
+        key_num = parent->key_num;
+        _save_node(bptree, parent, 1);
     }
     else
     {
+        _free_node(bptree, bptree->root_node);
         parent = _new_inner(bptree, node->addr, 0);
+        _insert_into_inner(parent, new_node->keys[0], new_node->addr);
         node->addr = _next_addr(bptree);
         parent->children[0] = node->addr;
         bptree->root_node = parent;
+        _save_node(bptree, parent, 0);
     }
-    _insert_into_inner(parent, new_node->keys[0], new_node->addr);
-    unsigned int key_num = parent->key_num;
+
     _save_node(bptree, new_node, 1);
-    _save_node(bptree, parent, 0);
     _save_node(bptree, node, 1);
-
-    if (parent != bptree->root_node)
-    {
-        _free_node(bptree, parent);
-    }
-
     if (key_num >= MAX_KEY_NUM)
     {
         _split_inner(bptree, addr_stk);
@@ -443,26 +443,25 @@ void _split_leaf(bptree_t *bptree, node_t *node, stack_t *addr_stk)
     _copy_leaf(node, new_node, spliter_idx);
     node->key_num = spliter_idx;
 
+    unsigned int key_num = 0;
     if (!stk_isempty(addr_stk))
     {
         parent = _read_node(bptree, stk_top(addr_stk));
+        _insert_into_inner(parent, new_node->keys[0], new_node->addr);
+        key_num = parent->key_num;
+        _save_node(bptree, parent, 1);
     }
     else
     {
         parent = _new_inner(bptree, node->addr, 0);
+        _insert_into_inner(parent, new_node->keys[0], new_node->addr);
         node->addr = _next_addr(bptree);
         parent->children[0] = node->addr;
         bptree->root_node = parent;
+        _save_node(bptree, parent, 0);
     }
-    _insert_into_inner(parent, new_node->keys[0], new_node->addr);
-    unsigned int key_num = parent->key_num;
-    _save_node(bptree, new_node, 1);
-    _save_node(bptree, parent, 0);
 
-    if (parent != bptree->root_node)
-    {
-        _free_node(bptree, parent);
-    }
+    _save_node(bptree, new_node, 1);
 
     if (key_num >= MAX_KEY_NUM)
     {
