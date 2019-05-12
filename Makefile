@@ -16,8 +16,8 @@ main: $(OBJECTS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $(OUTPUT_DIR)/$@
 
-test: clean main
-	$(OUTPUT_DIR)/main
+run: clean main
+	cd $(OUTPUT_DIR); ./main; cd ..
 
 clean:
 	rm -rf $(OUTPUT_DIR)/* *.o *.blk
