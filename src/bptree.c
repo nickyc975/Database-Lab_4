@@ -42,8 +42,8 @@ node_t *_read_node(bptree_t *bptree, addr_t addr);
 int _save_node(bptree_t *bptree, node_t *node, int free_after_save);
 void _free_node(bptree_t *bptree, node_t *node);
 
-data_blk_t *_new_data_blk(bptree_t *bptree);
-int _save_data_blk(bptree_t *bptree, data_blk_t *data_blk, int free_after_save);
+value_blk_t *_new_value_blk(bptree_t *bptree);
+int _save_value_blk(bptree_t *bptree, value_blk_t *value_blk, int free_after_save);
 
 node_t *_query(bptree_t *bptree, int key, stack_t *addr_stk);
 
@@ -172,14 +172,14 @@ void bptree_free(bptree_t *bptree, bptree_meta_t *meta)
     }
 }
 
-data_blk_t *read_data_blk(bptree_t *bptree, addr_t blk_addr)
+value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr)
 {
-    return (data_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
+    return (value_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
 }
 
-void free_data_blk(bptree_t *bptree, data_blk_t *data_blk)
+void free_value_blk(bptree_t *bptree, value_blk_t *value_blk)
 {
-    freeBlockInBuffer((unsigned char *)data_blk, bptree->buffer);
+    freeBlockInBuffer((unsigned char *)value_blk, bptree->buffer);
 }
 
 addr_t _next_addr(bptree_t *bptree)
@@ -231,21 +231,21 @@ void _free_node(bptree_t *bptree, node_t *node)
     freeBlockInBuffer((unsigned char *)node, bptree->buffer);
 }
 
-data_blk_t *_new_data_blk(bptree_t *bptree)
+value_blk_t *_new_value_blk(bptree_t *bptree)
 {
-    data_blk_t *data_blk = (data_blk_t *)getNewBlockInBuffer(bptree->buffer);
-    data_blk->value_num = 0;
-    data_blk->blk_addr = _next_addr(bptree);
-    data_blk->next_blk_addr = 0;
-    return data_blk;
+    value_blk_t *value_blk = (value_blk_t *)getNewBlockInBuffer(bptree->buffer);
+    value_blk->value_num = 0;
+    value_blk->blk_addr = _next_addr(bptree);
+    value_blk->next_blk_addr = 0;
+    return value_blk;
 }
 
-int _save_data_blk(bptree_t *bptree, data_blk_t *data_blk, int free_after_save)
+int _save_value_blk(bptree_t *bptree, value_blk_t *value_blk, int free_after_save)
 {
-    int result = writeBlockToDisk((unsigned char *)data_blk, data_blk->blk_addr, bptree->buffer);
+    int result = writeBlockToDisk((unsigned char *)value_blk, value_blk->blk_addr, bptree->buffer);
     if (free_after_save)
     {
-        free_data_blk(bptree, data_blk);
+        free_value_blk(bptree, value_blk);
     }
     return result;
 }
@@ -313,7 +313,7 @@ void _insert_into_inner(node_t *node, int key, addr_t child)
 
 void _insert_into_leaf(bptree_t *bptree, node_t *node, int key, addr_t value)
 {
-    data_blk_t *data_blk;
+    value_blk_t *value_blk;
     int temp_key = key, temp_blk_addr;
     if (node && node->type == LEAF)
     {
@@ -321,17 +321,17 @@ void _insert_into_leaf(bptree_t *bptree, node_t *node, int key, addr_t value)
         {
             if (node->keys[i] == temp_key)
             {
-                data_blk = read_data_blk(bptree, node->blk_addrs[i]);
-                data_blk->values[data_blk->value_num] = value;
-                data_blk->value_num++;
-                if (data_blk->value_num >= MAX_VALUE_NUM)
+                value_blk = read_value_blk(bptree, node->blk_addrs[i]);
+                value_blk->values[value_blk->value_num] = value;
+                value_blk->value_num++;
+                if (value_blk->value_num >= MAX_VALUE_NUM)
                 {
-                    _save_data_blk(bptree, data_blk, 1);
-                    data_blk = _new_data_blk(bptree);
-                    data_blk->next_blk_addr = node->blk_addrs[i];
-                    node->blk_addrs[i] = data_blk->blk_addr;
+                    _save_value_blk(bptree, value_blk, 1);
+                    value_blk = _new_value_blk(bptree);
+                    value_blk->next_blk_addr = node->blk_addrs[i];
+                    node->blk_addrs[i] = value_blk->blk_addr;
                 }
-                _save_data_blk(bptree, data_blk, 1);
+                _save_value_blk(bptree, value_blk, 1);
                 return;
             }
             else if (node->keys[i] > temp_key)
@@ -340,13 +340,13 @@ void _insert_into_leaf(bptree_t *bptree, node_t *node, int key, addr_t value)
             }
         }
 
-        data_blk = _new_data_blk(bptree);
+        value_blk = _new_value_blk(bptree);
 
-        data_blk->values[data_blk->value_num] = value;
-        data_blk->value_num++;
-        temp_blk_addr = data_blk->blk_addr;
+        value_blk->values[value_blk->value_num] = value;
+        value_blk->value_num++;
+        temp_blk_addr = value_blk->blk_addr;
 
-        _save_data_blk(bptree, data_blk, 1);
+        _save_value_blk(bptree, value_blk, 1);
 
         for (int i = 0; i < node->key_num; i++)
         {

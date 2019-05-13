@@ -7,13 +7,13 @@
 
 typedef struct node_struct node_t;
 
-typedef struct data_blk_struct
+typedef struct value_blk_struct
 {
     int value_num;
     addr_t blk_addr;
     addr_t next_blk_addr;
     addr_t values[MAX_VALUE_NUM];
-} data_blk_t;
+} value_blk_t;
 
 typedef struct bptree_meta_struct
 {
@@ -42,8 +42,8 @@ void bptree_print(bptree_t *bptree);
 
 void bptree_free(bptree_t *bptree, bptree_meta_t *meta);
 
-data_blk_t *read_data_blk(bptree_t *bptree, addr_t blk_addr);
+value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr);
 
-void free_data_blk(bptree_t *bptree, data_blk_t *data_blk);
+void free_value_blk(bptree_t *bptree, value_blk_t *value_blk);
 
 #endif

@@ -53,6 +53,12 @@ typedef struct database_struct
     bptree_meta_t bptree_meta;
 } database_t;
 
+addr_t next_blk_addr(addr_t addr);
+
+addr_t get_blk_addr(addr_t addr);
+
+addr_t get_blk_offset(addr_t addr);
+
 block_t *new_blk(Buffer *buffer);
 
 block_t *read_blk(Buffer *buffer, addr_t blk_addr);
@@ -69,7 +75,7 @@ int index_search(database_t *database, int key, addr_t base_addr);
 
 int project(database_t *database, addr_t base_addr);
 
-int next_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr);
+int nest_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr);
 
 int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr);
 
