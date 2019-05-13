@@ -50,7 +50,7 @@ typedef struct database_struct
     db_type type;
     Buffer *buffer;
     addr_t head_blk_addr;
-    bptree_meta_t *bptree_meta;
+    bptree_meta_t bptree_meta;
 } database_t;
 
 block_t *new_blk(Buffer *buffer);

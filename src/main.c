@@ -5,14 +5,14 @@
 #include "database.h"
 #include "../lib/libextmem.h"
 
-#define R_BLK_NUM 16
-#define S_BLK_NUM 32
-#define R_ADDR_PREFIX 0x520000
-#define S_ADDR_PREFIX 0x530000
+#define R_BLK_NUM 64
+#define S_BLK_NUM 128
+#define R_HEAD_BLK_ADDR 0x520000
+#define S_HEAD_BLK_ADDR 0x530000
 #define R_BPTREE_ROOT_ADDR 0x52000000
 #define S_BPTREE_ROOT_ADDR 0x53000000
 
-int gen_blocks(Buffer *buffer);
+int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db);
 
 int main(int argc, char *argv[])
 {
@@ -20,11 +20,36 @@ int main(int argc, char *argv[])
     Buffer *buffer = &_buffer;
     initBuffer(520, 64, buffer);
 
+    database_t R_db, S_db;
+    R_db.type = R_T;
+    R_db.buffer = buffer;
+    R_db.head_blk_addr = R_HEAD_BLK_ADDR;
+    R_db.bptree_meta.root_addr = R_BPTREE_ROOT_ADDR;
+    R_db.bptree_meta.leftmost_addr = R_BPTREE_ROOT_ADDR;
+    R_db.bptree_meta.last_alloc_addr = R_BPTREE_ROOT_ADDR;
+
+    S_db.type = S_T;
+    S_db.buffer = buffer;
+    S_db.head_blk_addr = S_HEAD_BLK_ADDR;
+    S_db.bptree_meta.root_addr = S_BPTREE_ROOT_ADDR;
+    S_db.bptree_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
+    S_db.bptree_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
+
     srand((unsigned int)time(NULL));
 
-    printf("io num: %ld\n", buffer->numIO);
-    gen_blocks(buffer);
-    printf("io num: %ld\n", buffer->numIO);
+    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+
+    gen_blocks(buffer, &R_db, &S_db);
+
+    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+
+    linear_search(&R_db, 40, 0x5200);
+
+    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+
+    linear_search(&S_db, 60, 0x5300);
+
+    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
 
     return 0;
 }
@@ -41,30 +66,27 @@ void gen_S(S *s)
     s->D = rand() % 1000 + 1;
 }
 
-int gen_blocks(Buffer *buffer)
+int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
 {
     addr_t blk_addr;
     bptree_t R_bptree, S_bptree;
-    bptree_meta_t R_meta, S_meta;
     block_t *block = new_blk(buffer);
 
-    R_meta.root_addr = R_BPTREE_ROOT_ADDR;
-    R_meta.leftmost_addr = R_BPTREE_ROOT_ADDR;
-    R_meta.last_alloc_addr = R_BPTREE_ROOT_ADDR;
-    bptree_init(&R_bptree, &R_meta, buffer);
+    bptree_init(&R_bptree, &(R_db->bptree_meta), buffer);
 
     for (int blk_num = 0; blk_num < R_BLK_NUM; blk_num++)
     {
-        blk_addr = R_ADDR_PREFIX + blk_num;
-        for (int i = 0; i < TUPLES_PER_BLK; i++)
+        blk_addr = R_HEAD_BLK_ADDR + blk_num;
+        while(block->tuple_num < TUPLES_PER_BLK)
         {
-            gen_R(&(block->R_tuples[i]));
-            bptree_insert(&R_bptree, block->R_tuples[i].A, blk_addr);
+            gen_R(&(block->R_tuples[block->tuple_num]));
+            bptree_insert(&R_bptree, block->R_tuples[block->tuple_num].A, blk_addr);
+            block->tuple_num++;
         }
 
         if (blk_num < R_BLK_NUM - 1)
         {
-            block->next_blk = blk_num + 1;
+            block->next_blk = blk_addr + 1;
         }
         else
         {
@@ -75,24 +97,23 @@ int gen_blocks(Buffer *buffer)
         block = new_blk(buffer);
     }
 
-    bptree_print(&R_bptree);
-    bptree_free(&R_bptree, &R_meta);
+    // bptree_print(&R_bptree);
+    bptree_free(&R_bptree, &(R_db->bptree_meta));
 
-    S_meta.root_addr = S_BPTREE_ROOT_ADDR;
-    S_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
-    S_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
-    bptree_init(&S_bptree, &S_meta, buffer);
+    bptree_init(&S_bptree, &(S_db->bptree_meta), buffer);
     for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
     {
-        for (int i = 0; i < TUPLES_PER_BLK; i++)
+        blk_addr = S_HEAD_BLK_ADDR + blk_num;
+        while(block->tuple_num < TUPLES_PER_BLK)
         {
-            gen_S(&(block->S_tuples[i]));
-            bptree_insert(&S_bptree, block->S_tuples[i].C, blk_addr);
+            gen_S(&(block->S_tuples[block->tuple_num]));
+            bptree_insert(&S_bptree, block->S_tuples[block->tuple_num].C, blk_addr);
+            block->tuple_num++;
         }
 
         if (blk_num < S_BLK_NUM - 1)
         {
-            block->next_blk = blk_num + 1;
+            block->next_blk = blk_addr + 1;
         }
         else
         {
@@ -103,11 +124,8 @@ int gen_blocks(Buffer *buffer)
         block = new_blk(buffer);
     }
 
-    bptree_print(&S_bptree);
-    bptree_free(&S_bptree, &S_meta);
+    // bptree_print(&S_bptree);
+    bptree_free(&S_bptree, &(S_db->bptree_meta));
     free_blk(buffer, block);
-
-    printf("numFreeBlk: %ld\n", buffer->numFreeBlk);
-
     return 0;
 }

@@ -32,13 +32,13 @@ void free_blk(Buffer *buffer, block_t *block)
 
 int linear_search(database_t *database, int key, addr_t base_addr)
 {
+    int count = 0;
     block_t *block, *blk_buf;
     addr_t addr = database->head_blk_addr;
 
     blk_buf = new_blk(database->buffer);
     while(addr)
     {
-        addr = block->next_blk;
         block = read_blk(database->buffer, addr);
         for (int i = 0; i < block->tuple_num; i++)
         {
@@ -62,16 +62,23 @@ int linear_search(database_t *database, int key, addr_t base_addr)
                     printf("Unknown database type: %d\n", database->type);
                     exit(1);
             }
-            
+
+            count++;
             blk_buf->tuple_num++;
             if (blk_buf->tuple_num >= TUPLES_PER_BLK)
             {
-                save_blk(database->buffer, blk_buf, base_addr, 0);
-                blk_buf->tuple_num = 0;
                 base_addr++;
+                blk_buf->next_blk = base_addr;
+                save_blk(database->buffer, blk_buf, base_addr - 1, 0);
+                blk_buf->tuple_num = 0;
             }
         }
+
+        addr = block->next_blk;
         free_blk(database->buffer, block);
     }
-    free_blk(database->buffer, blk_buf);
+
+    blk_buf->next_blk = 0;
+    save_blk(database->buffer, blk_buf, base_addr, 1);
+    return count;
 }
