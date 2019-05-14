@@ -6,7 +6,7 @@ OUTPUT_DIR = out
 CC = gcc
 CFLAGS = -g -Wall
 
-SRCS = libextmem.c stack.c bptree.c database.c main.c
+SRCS = libextmem.c stack.c hashbucket.c bptree.c database.c main.c
 OBJECTS = $(SRCS:.c=.o)
 
 main: $(OBJECTS)
