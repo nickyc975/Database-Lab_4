@@ -51,13 +51,31 @@ int main(int argc, char *argv[])
 
     printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
 
-    index_search(&R_db, 40, 0x6200);
+    binary_search(&R_db, 40, 0x6200);
 
     printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
 
-    index_search(&S_db, 60, 0x6300);
+    binary_search(&S_db, 60, 0x6300);
 
     printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+
+    index_search(&R_db, 40, 0x7200);
+
+    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+
+    index_search(&S_db, 60, 0x7300);
+
+    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+
+    if (R_db.bptree_meta.leaf_addrs)
+    {
+        free(R_db.bptree_meta.leaf_addrs);
+    }
+
+    if (S_db.bptree_meta.leaf_addrs)
+    {
+        free(S_db.bptree_meta.leaf_addrs);
+    }
 
     return 0;
 }
@@ -106,7 +124,8 @@ int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
     }
 
     // bptree_print(&R_bptree);
-    bptree_free(&R_bptree, &(R_db->bptree_meta));
+    bptree_getmeta(&R_bptree, &(R_db->bptree_meta));
+    bptree_free(&R_bptree);
 
     bptree_init(&S_bptree, &(S_db->bptree_meta), buffer);
 
@@ -134,7 +153,8 @@ int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
     }
 
     // bptree_print(&S_bptree);
-    bptree_free(&S_bptree, &(S_db->bptree_meta));
+    bptree_getmeta(&S_bptree, &(S_db->bptree_meta));
+    bptree_free(&S_bptree);
     free_blk(buffer, block);
     return 0;
 }

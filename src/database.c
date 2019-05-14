@@ -1,6 +1,9 @@
+#include <math.h>
 #include <stdio.h>
 
 #include "database.h"
+
+int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_addr);
 
 addr_t next_blk_addr(addr_t addr)
 {
@@ -98,25 +101,60 @@ int linear_search(database_t *database, int key, addr_t base_addr)
     return count;
 }
 
+int binary_search(database_t *database, int key, addr_t base_addr)
+{
+    node_t *node;
+    addr_t node_addr, value_blk_addr = 0;
+    bptree_t *bptree = &(bptree_t){.buffer = database->buffer};
+    int last_pos = database->bptree_meta.leaf_num, pos = last_pos / 2, temp;
+
+    while (pos >= 0 && pos < database->bptree_meta.leaf_num)
+    {
+        node_addr = database->bptree_meta.leaf_addrs[pos];
+        node = read_node(bptree, node_addr);
+        if (key < node_minkey(node))
+        {
+            temp = pos;
+            pos -= (abs(last_pos - temp) + 1) / 2;
+            last_pos = temp;
+        }
+        else if (key <= node_maxkey(node))
+        {
+            value_blk_addr = node_get(node, key);
+            pos = -1;
+        }
+        else
+        {
+            temp = pos;
+            pos += (abs(last_pos - temp) + 1) / 2;
+            last_pos = temp;
+        }
+        free_node(bptree, node);
+    }
+
+    return _read_value_blks(database, value_blk_addr, base_addr);
+}
+
 int index_search(database_t *database, int key, addr_t base_addr)
 {
-    int count = 0;
-
     bptree_t bptree;
-    value_blk_t *value_blk;
-
-    addr_t curr_blk_addr = 0, blk_addr, blk_offset;
-    block_t *block = NULL, *blk_buf = new_blk(database->buffer);
-
     bptree_init(&bptree, &(database->bptree_meta), database->buffer);
-
     addr_t value_blk_addr = bptree_query(&bptree, key);
+    bptree_free(&bptree);
+    return _read_value_blks(database, value_blk_addr, base_addr);
+}
 
-    bptree_free(&bptree, &(database->bptree_meta));
+int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_addr)
+{
+    int count = 0;
+    value_blk_t *value_blk;
+    addr_t curr_blk_addr = 0, blk_addr, blk_offset;
+    bptree_t *bptree = &(bptree_t){.buffer = database->buffer};
+    block_t *block = NULL, *blk_buf = new_blk(database->buffer);
 
     while(value_blk_addr)
     {
-        value_blk = read_value_blk(&bptree, value_blk_addr);
+        value_blk = read_value_blk(bptree, value_blk_addr);
         for (int i = 0; i < value_blk->value_num; i++)
         {
             blk_addr = get_blk_addr(value_blk->values[i]);
@@ -161,7 +199,7 @@ int index_search(database_t *database, int key, addr_t base_addr)
             }
         }
         value_blk_addr = value_blk->next_blk_addr;
-        free_value_blk(&bptree, value_blk);
+        free_value_blk(bptree, value_blk);
     }
 
     if (block)

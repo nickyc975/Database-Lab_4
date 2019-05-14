@@ -20,6 +20,9 @@ typedef struct bptree_meta_struct
     addr_t root_addr;
     addr_t leftmost_addr;
     addr_t last_alloc_addr;
+
+    addr_t *leaf_addrs;
+    unsigned int leaf_num;
 } bptree_meta_t;
 
 typedef struct bptree_struct
@@ -40,7 +43,21 @@ addr_t bptree_query(bptree_t *bptree, int key);
 
 void bptree_print(bptree_t *bptree);
 
-void bptree_free(bptree_t *bptree, bptree_meta_t *meta);
+void bptree_getmeta(bptree_t *bptree, bptree_meta_t *meta);
+
+void bptree_free(bptree_t *bptree);
+
+node_t *read_node(bptree_t *bptree, addr_t addr);
+
+addr_t node_get(node_t *node, int key);
+
+int node_maxkey(node_t *node);
+
+int node_minkey(node_t *node);
+
+addr_t node_next_node(node_t *node);
+
+void free_node(bptree_t *bptree, node_t *node);
 
 value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr);
 
