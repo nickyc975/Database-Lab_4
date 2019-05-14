@@ -106,7 +106,7 @@ int binary_search(database_t *database, int key, addr_t base_addr)
     node_t *node;
     addr_t node_addr, value_blk_addr = 0;
     bptree_t *bptree = &(bptree_t){.buffer = database->buffer};
-    int last_pos = database->bptree_meta.leaf_num, pos = last_pos / 2, temp;
+    int last_pos = database->bptree_meta.leaf_num - 1, pos = (last_pos + 1) / 2, temp;
 
     while (pos >= 0 && pos < database->bptree_meta.leaf_num)
     {

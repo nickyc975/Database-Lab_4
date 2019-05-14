@@ -5,8 +5,8 @@
 #include "database.h"
 #include "../lib/libextmem.h"
 
-#define R_BLK_NUM 16
-#define S_BLK_NUM 32
+#define R_BLK_NUM 64
+#define S_BLK_NUM 128
 #define R_HEAD_BLK_ADDR 0x520000
 #define S_HEAD_BLK_ADDR 0x530000
 #define R_BPTREE_ROOT_ADDR 0x52000000
@@ -35,37 +35,34 @@ int main(int argc, char *argv[])
     S_db.bptree_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
     S_db.bptree_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
 
+    int count;
+    unsigned long io_num;
     srand((unsigned int)time(NULL));
-
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
-
     gen_blocks(buffer, &R_db, &S_db);
 
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+    io_num = buffer->numIO;
+    count = linear_search(&R_db, 40, 0x5200);
+    printf("linear search in R found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
-    linear_search(&R_db, 40, 0x5200);
+    io_num = buffer->numIO;
+    count = linear_search(&S_db, 60, 0x5300);
+    printf("linear search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+    io_num = buffer->numIO;
+    count = binary_search(&R_db, 40, 0x6200);
+    printf("binary search in R found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
-    linear_search(&S_db, 60, 0x5300);
+    io_num = buffer->numIO;
+    count = binary_search(&S_db, 60, 0x6300);
+    printf("binary search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+    io_num = buffer->numIO;
+    count = index_search(&R_db, 40, 0x7200);
+    printf("index search in R found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
-    binary_search(&R_db, 40, 0x6200);
-
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
-
-    binary_search(&S_db, 60, 0x6300);
-
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
-
-    index_search(&R_db, 40, 0x7200);
-
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
-
-    index_search(&S_db, 60, 0x7300);
-
-    printf("numIO: %ld, numFreeBlk: %ld\n", buffer->numIO, buffer->numFreeBlk);
+    io_num = buffer->numIO;
+    count = index_search(&S_db, 60, 0x7300);
+    printf("index search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
     if (R_db.bptree_meta.leaf_addrs)
     {
