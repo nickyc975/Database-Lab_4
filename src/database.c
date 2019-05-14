@@ -2,8 +2,16 @@
 #include <stdio.h>
 
 #include "database.h"
+#include "hashbucket.h"
+
+#define HASHBUKT_NUM 60
 
 int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_addr);
+
+int hash(int key)
+{
+    return key - 1;
+}
 
 addr_t next_blk_addr(addr_t addr)
 {
@@ -365,6 +373,107 @@ int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 {
     int count = 0;
+    block_t *R_blk, *S_blk;
+    bukt_iter_t *R_bukt_iter, *S_bukt_iter;
+    block_t *blk_buf = new_blk(R_db->buffer);
+    hashbukt_t *R_hashbukt = new_hashbukt(HASHBUKT_NUM, &hash);
+    hashbukt_t *S_hashbukt = new_hashbukt(HASHBUKT_NUM, &hash);
+    addr_t R_blk_addr = R_db->head_blk_addr, R_curr_blk_addr = 0;
+    addr_t S_blk_addr = S_db->head_blk_addr, S_curr_blk_addr = 0;
+
+    while (R_blk_addr)
+    {
+        R_blk = read_blk(R_db->buffer, R_blk_addr);
+        for (int i = 0; i < R_blk->tuple_num; i++)
+        {
+            hashbukt_put(R_hashbukt, R_blk->R_tuples[i].key, R_blk_addr + i);
+        }
+        R_blk_addr = R_blk->next_blk;
+        free_blk(R_db->buffer, R_blk);
+    }
+
+    while (S_blk_addr)
+    {
+        S_blk = read_blk(S_db->buffer, S_blk_addr);
+        for (int i = 0; i < S_blk->tuple_num; i++)
+        {
+            hashbukt_put(S_hashbukt, S_blk->S_tuples[i].key, S_blk_addr + i);
+        }
+        S_blk_addr = S_blk->next_blk;
+        free_blk(S_db->buffer, S_blk);
+    }
+    
+    R_blk = NULL; S_blk = NULL;
+    for (int i = 0; i < HASHBUKT_NUM; i++)
+    {
+        R_bukt_iter = hashbukt_bukt_at(R_hashbukt, i);
+        while (bukt_has_next(R_bukt_iter))
+        {
+            bukt_next(R_bukt_iter);
+            addr_t R_value = bukt_curr_value(R_bukt_iter);
+            addr_t R_blk_addr = get_blk_addr(R_value);
+            int R_blk_offset = get_blk_offset(R_value);
+
+            if (R_blk_addr != R_curr_blk_addr)
+            {
+                if (R_blk)
+                {
+                    free_blk(R_db->buffer, R_blk);
+                }
+                R_blk = read_blk(R_db->buffer, R_blk_addr);
+                R_curr_blk_addr = R_blk_addr;
+            }
+            
+            S_bukt_iter = hashbukt_bukt_at(S_hashbukt, i);
+            while (bukt_has_next(S_bukt_iter))
+            {
+                bukt_next(S_bukt_iter);
+                addr_t S_value = bukt_curr_value(S_bukt_iter);
+                addr_t S_blk_addr = get_blk_addr(S_value);
+                int S_blk_offset = get_blk_offset(S_value);
+
+                if (S_blk_addr != S_curr_blk_addr)
+                {
+                    if (S_blk)
+                    {
+                        free_blk(S_db->buffer, S_blk);
+                    }
+                    S_blk = read_blk(S_db->buffer, S_blk_addr);
+                    S_curr_blk_addr = S_blk_addr;
+                }
+
+                blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = R_blk->R_tuples[R_blk_offset];
+                blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = S_blk->S_tuples[S_blk_offset];
+                blk_buf->tuple_num++;
+                count++;
+                if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
+                {
+                    base_addr++;
+                    blk_buf->next_blk = base_addr;
+                    save_blk(R_db->buffer, blk_buf, base_addr - 1, 0);
+                    blk_buf->tuple_num = 0;
+                }
+            }
+            free_bukt_iter(S_bukt_iter);
+        }
+        free_bukt_iter(R_bukt_iter);
+    }
+
+    if (R_blk)
+    {
+        free_blk(R_db->buffer, R_blk);
+    }
+
+    if (S_blk)
+    {
+        free_blk(S_db->buffer, S_blk);
+    }
+
+    free_hashbukt(R_hashbukt);
+    free_hashbukt(S_hashbukt);
+
+    blk_buf->next_blk = 0;
+    save_blk(R_db->buffer, blk_buf, base_addr, 1);
     return count;
 }
 

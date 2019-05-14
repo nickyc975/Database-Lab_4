@@ -49,7 +49,7 @@ void hashbukt_put(hashbukt_t *hashbukt, int key, addr_t value)
         hashbukt->buckets[bukt_no] = bukt;
         return;
     }
-    printf("hash value %d out of interval [0, %d)!", bukt_no, hashbukt->bukt_num);
+    printf("hash value %d out of interval [0, %d)!\n", bukt_no, hashbukt->bukt_num);
     exit(1);
 }
 
@@ -62,7 +62,7 @@ bukt_iter_t *hashbukt_get(hashbukt_t *hashbukt, int key)
         iter->next_bukt = hashbukt->buckets[bukt_no];
         return iter;
     }
-    printf("hash value %d out of interval [0, %d)!", bukt_no, hashbukt->bukt_num);
+    printf("hash value %d out of interval [0, %d)!\n", bukt_no, hashbukt->bukt_num);
     exit(1);
 }
 
@@ -74,7 +74,7 @@ bukt_iter_t *hashbukt_bukt_at(hashbukt_t *hashbukt, int index)
         iter->next_bukt = hashbukt->buckets[index];
         return iter;
     }
-    printf("index %d out of interval [0, %d)!", index, hashbukt->bukt_num);
+    printf("index %d out of interval [0, %d)!\n", index, hashbukt->bukt_num);
     exit(1);
 }
 
@@ -90,6 +90,7 @@ void bukt_next(bukt_iter_t *iter)
         iter->curr_key = iter->next_bukt->key;
         iter->curr_value = iter->next_bukt->value;
         iter->next_bukt = iter->next_bukt->next_bukt;
+        return;
     }
     printf("no more buckets!\n");
     exit(1);
