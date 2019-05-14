@@ -144,6 +144,31 @@ int index_search(database_t *database, int key, addr_t base_addr)
     return _read_value_blks(database, value_blk_addr, base_addr);
 }
 
+int project(database_t *database, addr_t base_addr)
+{
+    int count = 0;
+    block_t *block = new_blk(database->buffer);
+    key_iter_t *iter = new_key_iter(&(database->bptree_meta), database->buffer);
+    while(has_next_key(iter))
+    {
+        block->tuples[block->tuple_num] = next_key(iter);
+        block->tuple_num++;
+        count++;
+        if (block->tuple_num >= TUPLES_PER_BLK * sizeof(R) / sizeof(int))
+        {
+            base_addr++;
+            block->next_blk = base_addr;
+            save_blk(database->buffer, block, base_addr - 1, 0);
+            block->tuple_num = 0;
+        }
+    }
+
+    block->next_blk = 0;
+    save_blk(database->buffer, block, base_addr, 1);
+    free_key_iter(iter);
+    return count;
+}
+
 int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_addr)
 {
     int count = 0;

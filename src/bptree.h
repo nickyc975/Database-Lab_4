@@ -7,6 +7,8 @@
 
 typedef struct node_struct node_t;
 
+typedef struct key_iter_struct key_iter_t;
+
 typedef struct value_blk_struct
 {
     int value_num;
@@ -46,6 +48,14 @@ void bptree_print(bptree_t *bptree);
 void bptree_getmeta(bptree_t *bptree, bptree_meta_t *meta);
 
 void bptree_free(bptree_t *bptree);
+
+key_iter_t *new_key_iter(bptree_meta_t *meta, Buffer *buffer);
+
+int has_next_key(key_iter_t *iter);
+
+int next_key(key_iter_t *iter);
+
+void free_key_iter(key_iter_t *iter);
 
 node_t *read_node(bptree_t *bptree, addr_t addr);
 

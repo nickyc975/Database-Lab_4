@@ -40,8 +40,9 @@ typedef struct block_struct
 
     union
     {
-        S S_tuples[TUPLES_PER_BLK];
         R R_tuples[TUPLES_PER_BLK];
+        S S_tuples[TUPLES_PER_BLK];
+        int tuples[TUPLES_PER_BLK * sizeof(R) / sizeof(int)];
     };
 } block_t;
 

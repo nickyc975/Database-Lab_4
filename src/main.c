@@ -5,8 +5,8 @@
 #include "database.h"
 #include "../lib/libextmem.h"
 
-#define R_BLK_NUM 64
-#define S_BLK_NUM 128
+#define R_BLK_NUM 16
+#define S_BLK_NUM 32
 #define R_HEAD_BLK_ADDR 0x520000
 #define S_HEAD_BLK_ADDR 0x530000
 #define R_BPTREE_ROOT_ADDR 0x52000000
@@ -63,6 +63,14 @@ int main(int argc, char *argv[])
     io_num = buffer->numIO;
     count = index_search(&S_db, 60, 0x7300);
     printf("index search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+
+    io_num = buffer->numIO;
+    count = project(&R_db, 0x8200);
+    printf("project from R to A created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+
+    io_num = buffer->numIO;
+    count = project(&S_db, 0x8300);
+    printf("project from S to C created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
     if (R_db.bptree_meta.leaf_addrs)
     {

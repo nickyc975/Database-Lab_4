@@ -32,6 +32,13 @@ struct node_struct
     };
 };
 
+struct key_iter_struct
+{
+    Buffer *buffer;
+    node_t *curr_node;
+    unsigned int key_cursor;
+};
+
 int indent = 0;
 
 addr_t _next_addr(bptree_t *bptree);
@@ -192,6 +199,75 @@ void bptree_free(bptree_t *bptree)
     if (bptree->leftmost_node)
     {
         free_node(bptree, bptree->leftmost_node);
+    }
+}
+
+key_iter_t *new_key_iter(bptree_meta_t *meta, Buffer *buffer)
+{
+    if (meta->leftmost_addr)
+    {
+        bptree_t *bptree = &(bptree_t){.buffer = buffer};
+        key_iter_t *iter = (key_iter_t *)malloc(sizeof(key_iter_t));
+
+        iter->buffer = buffer;
+        iter->curr_node = read_node(bptree, meta->leftmost_addr);
+        if (!iter->curr_node)
+        {
+            printf("Invalid node addr %d\n", meta->leftmost_addr);
+            exit(1);
+        }
+        iter->key_cursor = 0;
+        return iter;
+    }
+
+    return NULL;
+}
+
+int has_next_key(key_iter_t *iter)
+{
+    return iter->key_cursor < iter->curr_node->key_num || iter->curr_node->next_node != 0;
+}
+
+int next_key(key_iter_t *iter)
+{
+    int result = 0;
+    if (iter->key_cursor < iter->curr_node->key_num)
+    {
+        result = iter->curr_node->keys[iter->key_cursor];
+        iter->key_cursor++;
+    }
+    else if (iter->curr_node->next_node != 0)
+    {
+        addr_t next_addr = iter->curr_node->next_node;
+        bptree_t *bptree = &(bptree_t){.buffer = iter->buffer};
+        free_node(bptree, iter->curr_node);
+        iter->curr_node = read_node(bptree, next_addr);
+        if (!iter->curr_node)
+        {
+            printf("Invalid node addr %d\n", next_addr);
+            exit(1);
+        }
+        iter->key_cursor = 0;
+        result = iter->curr_node->keys[iter->key_cursor];
+        iter->key_cursor++;
+    }
+    else
+    {
+        printf("No more keys!\n");
+        exit(1);
+    }
+    return result;
+}
+
+void free_key_iter(key_iter_t *iter)
+{
+    if (iter)
+    {
+        if (iter->curr_node)
+        {
+            free_node(&(bptree_t){.buffer = iter->buffer}, iter->curr_node);
+        }
+        free(iter);
     }
 }
 
