@@ -9,6 +9,8 @@ typedef struct node_struct node_t;
 
 typedef struct key_iter_struct key_iter_t;
 
+typedef struct value_blk_iter_struct value_blk_iter_t;
+
 typedef struct value_blk_struct
 {
     int value_num;
@@ -55,6 +57,8 @@ int has_next_key(key_iter_t *iter);
 
 int next_key(key_iter_t *iter);
 
+addr_t curr_blk_addr(key_iter_t *iter);
+
 void free_key_iter(key_iter_t *iter);
 
 node_t *read_node(bptree_t *bptree, addr_t addr);
@@ -68,6 +72,14 @@ int node_minkey(node_t *node);
 addr_t node_next_node(node_t *node);
 
 void free_node(bptree_t *bptree, node_t *node);
+
+value_blk_iter_t *new_value_blk_iter(addr_t addr, Buffer *buffer);
+
+int has_next_value(value_blk_iter_t *iter);
+
+addr_t next_value(value_blk_iter_t *iter);
+
+void free_value_blk_iter(value_blk_iter_t *iter);
 
 value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr);
 

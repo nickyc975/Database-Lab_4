@@ -247,7 +247,118 @@ int nest_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 
 int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 {
-    int count = 0;
+    int count = 0, R_key = 0, S_key = 0;
+    block_t *R_curr_blk = NULL, *S_curr_blk = NULL;
+    addr_t R_curr_blk_addr = 0, S_curr_blk_addr = 0;
+    addr_t R_value_blk_addr, S_value_blk_addr;
+    block_t *blk_buf = new_blk(R_db->buffer);
+    key_iter_t *R_iter = new_key_iter(&(R_db->bptree_meta), R_db->buffer);
+    key_iter_t *S_iter = new_key_iter(&(S_db->bptree_meta), S_db->buffer);
+
+    while(has_next_key(R_iter) || has_next_key(S_iter))
+    {
+        if (R_key == S_key && has_next_key(R_iter) && has_next_key(S_iter))
+        {
+            R_key = next_key(R_iter);
+            S_key = next_key(S_iter);
+        }
+        else if (R_key < S_key && has_next_key(R_iter))
+        {
+            R_key = next_key(R_iter);
+        }
+        else if (R_key > S_key && has_next_key(S_iter))
+        {
+            S_key = next_key(S_iter);
+        }
+        else
+        {
+            break;
+        }
+
+        if (R_key == S_key)
+        {
+            R_value_blk_addr = curr_blk_addr(R_iter);
+            S_value_blk_addr = curr_blk_addr(S_iter);
+            value_blk_iter_t *R_value_iter = new_value_blk_iter(R_value_blk_addr, R_db->buffer);
+
+            while (has_next_value(R_value_iter))
+            {
+                block_t *R_blk;
+                addr_t R_value = next_value(R_value_iter);
+                addr_t R_blk_addr = get_blk_addr(R_value);
+                int R_blk_offset = get_blk_offset(R_value);
+
+                if (R_blk_addr == R_curr_blk_addr)
+                {
+                    R_blk = R_curr_blk;
+                }
+                else
+                {
+                    R_blk = read_blk(R_db->buffer, R_blk_addr);
+                    if (R_curr_blk)
+                    {
+                        free_blk(R_db->buffer, R_curr_blk);
+                    }
+                    R_curr_blk_addr = R_blk_addr;
+                    R_curr_blk = R_blk;
+                }
+                
+                 value_blk_iter_t *S_value_iter = new_value_blk_iter(S_value_blk_addr, S_db->buffer);
+                 while (has_next_value(S_value_iter))
+                 {
+                    block_t *S_blk;
+                    addr_t S_value = next_value(S_value_iter);
+                    addr_t S_blk_addr = get_blk_addr(S_value);
+                    int S_blk_offset = get_blk_offset(S_value);
+
+                    if (S_blk_addr == S_curr_blk_addr)
+                    {
+                        S_blk = S_curr_blk;
+                    }
+                    else
+                    {
+                        S_blk = read_blk(S_db->buffer, S_blk_addr);
+                        if (S_curr_blk)
+                    {
+                        free_blk(S_db->buffer, S_curr_blk);
+                    }
+                        S_curr_blk_addr = S_blk_addr;
+                        S_curr_blk = S_blk;
+                    }
+
+                    blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = R_blk->R_tuples[R_blk_offset];
+                    blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = S_blk->S_tuples[S_blk_offset];
+                    blk_buf->tuple_num++;
+                    count++;
+                    if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
+                    {
+                        base_addr++;
+                        blk_buf->next_blk = base_addr;
+                        save_blk(R_db->buffer, blk_buf, base_addr - 1, 0);
+                        blk_buf->tuple_num = 0;
+                    }
+                 }
+                 free_value_blk_iter(S_value_iter);
+            }
+            free_value_blk_iter(R_value_iter);
+        }
+    }
+
+    if (R_curr_blk)
+    {
+        free_blk(R_db->buffer, R_curr_blk);
+    }
+
+    if (S_curr_blk)
+    {
+        free_blk(S_db->buffer, S_curr_blk);
+    }
+
+    free_key_iter(R_iter);
+    free_key_iter(S_iter);
+
+    blk_buf->next_blk = 0;
+    save_blk(R_db->buffer, blk_buf, base_addr, 1);
     return count;
 }
 

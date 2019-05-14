@@ -39,6 +39,13 @@ struct key_iter_struct
     unsigned int key_cursor;
 };
 
+struct value_blk_iter_struct
+{
+    Buffer *buffer;
+    value_blk_t *curr_blk;
+    unsigned int value_cursor;
+};
+
 int indent = 0;
 
 addr_t _next_addr(bptree_t *bptree);
@@ -259,6 +266,11 @@ int next_key(key_iter_t *iter)
     return result;
 }
 
+addr_t curr_blk_addr(key_iter_t *iter)
+{
+    return iter->curr_node->blk_addrs[iter->key_cursor - 1];
+}
+
 void free_key_iter(key_iter_t *iter)
 {
     if (iter)
@@ -326,6 +338,75 @@ void free_node(bptree_t *bptree, node_t *node)
 value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr)
 {
     return (value_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
+}
+
+value_blk_iter_t *new_value_blk_iter(addr_t addr, Buffer *buffer)
+{
+    if (addr)
+    {
+        bptree_t *bptree = &(bptree_t){.buffer = buffer};
+        value_blk_iter_t *iter = (value_blk_iter_t *)malloc(sizeof(value_blk_iter_t));
+
+        iter->buffer = buffer;
+        iter->curr_blk = read_value_blk(bptree, addr);
+        if (!iter->curr_blk)
+        {
+            printf("Invalid node addr %d\n", addr);
+            exit(1);
+        }
+        iter->value_cursor = 0;
+        return iter;
+    }
+
+    return NULL;
+}
+
+int has_next_value(value_blk_iter_t *iter)
+{
+    return iter->value_cursor < iter->curr_blk->value_num || iter->curr_blk->next_blk_addr != 0;
+}
+
+addr_t next_value(value_blk_iter_t *iter)
+{
+    addr_t result = 0;
+    if (iter->value_cursor < iter->curr_blk->value_num)
+    {
+        result = iter->curr_blk->values[iter->value_cursor];
+        iter->value_cursor++;
+    }
+    else if (iter->curr_blk->next_blk_addr != 0)
+    {
+        addr_t next_addr = iter->curr_blk->next_blk_addr;
+        bptree_t *bptree = &(bptree_t){.buffer = iter->buffer};
+        free_value_blk(bptree, iter->curr_blk);
+        iter->curr_blk = read_value_blk(bptree, next_addr);
+        if (!iter->curr_blk)
+        {
+            printf("Invalid block addr %d\n", next_addr);
+            exit(1);
+        }
+        iter->value_cursor = 0;
+        result = iter->curr_blk->values[iter->value_cursor];
+        iter->value_cursor++;
+    }
+    else
+    {
+        printf("No more values!\n");
+        exit(1);
+    }
+    return result;
+}
+
+void free_value_blk_iter(value_blk_iter_t *iter)
+{
+    if (iter)
+    {
+        if (iter->curr_blk)
+        {
+            free_value_blk(&(bptree_t){.buffer = iter->buffer}, iter->curr_blk);
+        }
+        free(iter);
+    }
 }
 
 void free_value_blk(bptree_t *bptree, value_blk_t *value_blk)
