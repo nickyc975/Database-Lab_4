@@ -13,6 +13,8 @@ void hashbukt_put(hashbukt_t *hashbukt, int key, addr_t value);
 
 bukt_iter_t *hashbukt_get(hashbukt_t *hashbukt, int key);
 
+bukt_iter_t *hashbukt_bukt_at(hashbukt_t *hashbukt, int index);
+
 int bukt_has_next(bukt_iter_t *iter);
 
 void bukt_next(bukt_iter_t *iter);

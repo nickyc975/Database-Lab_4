@@ -66,6 +66,18 @@ bukt_iter_t *hashbukt_get(hashbukt_t *hashbukt, int key)
     exit(1);
 }
 
+bukt_iter_t *hashbukt_bukt_at(hashbukt_t *hashbukt, int index)
+{
+    if (index >= 0 && index < hashbukt->bukt_num)
+    {
+        bukt_iter_t *iter = (bukt_iter_t *)malloc(sizeof(bukt_iter_t));
+        iter->next_bukt = hashbukt->buckets[index];
+        return iter;
+    }
+    printf("index %d out of interval [0, %d)!", index, hashbukt->bukt_num);
+    exit(1);
+}
+
 int bukt_has_next(bukt_iter_t *iter)
 {
     return iter->next_bukt != NULL;
