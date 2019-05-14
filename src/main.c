@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
     printf("nest loop join R and S created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
     io_num = buffer->numIO;
-    count = sort_merge_join(&R_db, &S_db, 0x9500);
+    count = sort_merge_join(&R_db, &S_db, 0xA500);
     printf("sort merge join R and S created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
 
     printf("numFreeBlk: %ld\n", buffer->numFreeBlk);
