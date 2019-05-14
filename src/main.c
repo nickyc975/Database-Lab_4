@@ -23,6 +23,8 @@ int main(int argc, char *argv[])
     database_t R_db, S_db;
     R_db.type = R_T;
     R_db.buffer = buffer;
+    R_db.blk_num = R_BLK_NUM;
+    R_db.tuple_num = R_BLK_NUM * TUPLES_PER_BLK;
     R_db.head_blk_addr = R_HEAD_BLK_ADDR;
     R_db.bptree_meta.root_addr = R_BPTREE_ROOT_ADDR;
     R_db.bptree_meta.leftmost_addr = R_BPTREE_ROOT_ADDR;
@@ -30,6 +32,8 @@ int main(int argc, char *argv[])
 
     S_db.type = S_T;
     S_db.buffer = buffer;
+    S_db.blk_num = S_BLK_NUM;
+    S_db.tuple_num = S_BLK_NUM * TUPLES_PER_BLK;
     S_db.head_blk_addr = S_HEAD_BLK_ADDR;
     S_db.bptree_meta.root_addr = S_BPTREE_ROOT_ADDR;
     S_db.bptree_meta.leftmost_addr = S_BPTREE_ROOT_ADDR;
@@ -71,6 +75,12 @@ int main(int argc, char *argv[])
     io_num = buffer->numIO;
     count = project(&S_db, 0x8300);
     printf("project from S to C created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+
+    io_num = buffer->numIO;
+    count = nest_loop_join(&R_db, &S_db, 0x9500);
+    printf("nest loop join R and S created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+
+    printf("numFreeBlk: %ld\n", buffer->numFreeBlk);
 
     if (R_db.bptree_meta.leaf_addrs)
     {

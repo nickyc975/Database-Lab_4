@@ -33,6 +33,12 @@ typedef struct S_struct
     int D; 
 } S;
 
+typedef struct joined_tuple_struct
+{
+    R R_tuple;
+    S S_tuple;
+} joined_tuple_t;
+
 typedef struct block_struct
 {
     int tuple_num;
@@ -43,6 +49,7 @@ typedef struct block_struct
         R R_tuples[TUPLES_PER_BLK];
         S S_tuples[TUPLES_PER_BLK];
         int tuples[TUPLES_PER_BLK * sizeof(R) / sizeof(int)];
+        joined_tuple_t joined_tuples[TUPLES_PER_BLK / 2];
     };
 } block_t;
 
@@ -51,6 +58,8 @@ typedef struct database_struct
     db_type type;
     Buffer *buffer;
     addr_t head_blk_addr;
+    unsigned int blk_num;
+    unsigned int tuple_num;
     bptree_meta_t bptree_meta;
 } database_t;
 

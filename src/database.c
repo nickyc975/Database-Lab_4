@@ -169,6 +169,94 @@ int project(database_t *database, addr_t base_addr)
     return count;
 }
 
+int nest_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr)
+{
+    int count = 0;
+    int S_blks_len = 0;
+    block_t *R_blk, *S_blks[6];
+    block_t *blk_buf = new_blk(R_db->buffer);
+    addr_t next_R_blk_addr = R_db->head_blk_addr, next_S_blk_addr = S_db->head_blk_addr;
+
+    while(next_R_blk_addr)
+    {
+        int S_blk_num = 0;
+        R_blk = read_blk(R_db->buffer, next_R_blk_addr);
+        while(S_blk_num < S_db->blk_num)
+        {
+            while(S_blks_len < 6)
+            {
+                if (next_S_blk_addr)
+                {
+                    S_blks[S_blks_len] = read_blk(S_db->buffer, next_S_blk_addr);
+                }
+                else
+                {
+                    S_blks[S_blks_len] = read_blk(S_db->buffer, S_db->head_blk_addr);
+                }
+                next_S_blk_addr = S_blks[S_blks_len]->next_blk;
+                S_blks_len++;
+            }
+
+            for (int i = 0; i < S_blks_len && S_blk_num < S_db->blk_num; i++, S_blk_num++)
+            {
+                for (int j = 0; j < R_blk->tuple_num; j++)
+                {
+                    for (int k = 0; k < S_blks[i]->tuple_num; k++)
+                    {
+                        if (R_blk->R_tuples[j].key == S_blks[i]->S_tuples[k].key)
+                        {
+                            blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = R_blk->R_tuples[j];
+                            blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = S_blks[i]->S_tuples[k];
+                            blk_buf->tuple_num++;
+                            count++;
+                            if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
+                            {
+                                base_addr++;
+                                blk_buf->next_blk = base_addr;
+                                save_blk(R_db->buffer, blk_buf, base_addr - 1, 0);
+                                blk_buf->tuple_num = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (S_blk_num < S_db->blk_num)
+            {
+                while(S_blks_len > 0)
+                {
+                    S_blks_len--;
+                    free_blk(S_db->buffer, S_blks[S_blks_len]);
+                }
+            }
+        }
+        next_R_blk_addr = R_blk->next_blk;
+        free_blk(R_db->buffer, R_blk);
+    }
+
+    while(S_blks_len > 0)
+    {
+        S_blks_len--;
+        free_blk(S_db->buffer, S_blks[S_blks_len]);
+    }
+    
+    blk_buf->next_blk = 0;
+    save_blk(R_db->buffer, blk_buf, base_addr, 1);
+    return count;
+}
+
+int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
+{
+    int count = 0;
+    return count;
+}
+
+int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
+{
+    int count = 0;
+    return count;
+}
+
 int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_addr)
 {
     int count = 0;
