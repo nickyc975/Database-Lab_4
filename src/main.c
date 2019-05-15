@@ -12,17 +12,17 @@
 #define R_BPTREE_ROOT_ADDR 0x52000000
 #define S_BPTREE_ROOT_ADDR 0x53000000
 
-int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db);
+Buffer _buffer;
+Buffer *buffer = &_buffer;
+
+int gen_blocks(database_t *R_db, database_t *S_db);
 
 int main(int argc, char *argv[])
 {
-    Buffer _buffer;
-    Buffer *buffer = &_buffer;
     initBuffer(520, 64, buffer);
 
     database_t R_db, S_db;
     R_db.type = R_T;
-    R_db.buffer = buffer;
     R_db.blk_num = R_BLK_NUM;
     R_db.tuple_num = R_BLK_NUM * TUPLES_PER_BLK;
     R_db.head_blk_addr = R_HEAD_BLK_ADDR;
@@ -31,7 +31,6 @@ int main(int argc, char *argv[])
     R_db.bptree_meta.last_alloc_addr = R_BPTREE_ROOT_ADDR;
 
     S_db.type = S_T;
-    S_db.buffer = buffer;
     S_db.blk_num = S_BLK_NUM;
     S_db.tuple_num = S_BLK_NUM * TUPLES_PER_BLK;
     S_db.head_blk_addr = S_HEAD_BLK_ADDR;
@@ -43,7 +42,7 @@ int main(int argc, char *argv[])
     time_t now;
     unsigned long io_num;
     srand((unsigned int)time(NULL));
-    gen_blocks(buffer, &R_db, &S_db);
+    gen_blocks(&R_db, &S_db);
 
     now = time(NULL);
     io_num = buffer->numIO;
@@ -127,18 +126,18 @@ void gen_S(S *s)
     s->D = rand() % 1000 + 1;
 }
 
-int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
+int gen_blocks(database_t *R_db, database_t *S_db)
 {
     block_t *block;
     addr_t blk_addr;
     bptree_t R_bptree, S_bptree;
 
-    bptree_init(&R_bptree, &(R_db->bptree_meta), buffer);
+    bptree_init(&R_bptree, &(R_db->bptree_meta));
 
     blk_addr = R_HEAD_BLK_ADDR;
     for (int blk_num = 0; blk_num < R_BLK_NUM; blk_num++)
     {
-        block = new_blk(buffer);
+        block = new_blk();
         while(block->tuple_num < TUPLES_PER_BLK)
         {
             gen_R(&(block->R_tuples[block->tuple_num]));
@@ -154,7 +153,7 @@ int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
         {
             block->next_blk = 0;
         }
-        save_blk(buffer, block, blk_addr, 1);
+        save_blk(block, blk_addr, 1);
         blk_addr = next_blk_addr(blk_addr);
     }
 
@@ -162,12 +161,12 @@ int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
     bptree_getmeta(&R_bptree, &(R_db->bptree_meta));
     bptree_free(&R_bptree);
 
-    bptree_init(&S_bptree, &(S_db->bptree_meta), buffer);
+    bptree_init(&S_bptree, &(S_db->bptree_meta));
 
     blk_addr = S_HEAD_BLK_ADDR;
     for (int blk_num = 0; blk_num < S_BLK_NUM; blk_num++)
     {
-        block = new_blk(buffer);
+        block = new_blk();
         while(block->tuple_num < TUPLES_PER_BLK)
         {
             gen_S(&(block->S_tuples[block->tuple_num]));
@@ -183,13 +182,13 @@ int gen_blocks(Buffer *buffer, database_t *R_db, database_t *S_db)
         {
             block->next_blk = 0;
         }
-        save_blk(buffer, block, blk_addr, 1);
+        save_blk(block, blk_addr, 1);
         blk_addr = next_blk_addr(blk_addr);
     }
 
     // bptree_print(&S_bptree);
     bptree_getmeta(&S_bptree, &(S_db->bptree_meta));
     bptree_free(&S_bptree);
-    free_blk(buffer, block);
+    free_blk(block);
     return 0;
 }

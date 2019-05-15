@@ -56,7 +56,6 @@ typedef struct block_struct
 typedef struct database_struct
 {
     db_type type;
-    Buffer *buffer;
     addr_t head_blk_addr;
     unsigned int blk_num;
     unsigned int tuple_num;
@@ -69,13 +68,13 @@ addr_t get_blk_addr(addr_t addr);
 
 addr_t get_blk_offset(addr_t addr);
 
-block_t *new_blk(Buffer *buffer);
+block_t *new_blk();
 
-block_t *read_blk(Buffer *buffer, addr_t blk_addr);
+block_t *read_blk(addr_t blk_addr);
 
-int save_blk(Buffer *buffer, block_t *block, addr_t blk_addr, int free_after_save);
+int save_blk(block_t *block, addr_t blk_addr, int free_after_save);
 
-void free_blk(Buffer *buffer, block_t *block);
+void free_blk(block_t *block);
 
 int linear_search(database_t *database, int key, addr_t base_addr);
 
