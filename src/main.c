@@ -5,8 +5,8 @@
 #include "database.h"
 #include "../lib/libextmem.h"
 
-#define R_BLK_NUM 512
-#define S_BLK_NUM 1024
+#define R_BLK_NUM 16
+#define S_BLK_NUM 32
 #define R_HEAD_BLK_ADDR 0x520000
 #define S_HEAD_BLK_ADDR 0x530000
 #define R_BPTREE_ROOT_ADDR 0x52000000
