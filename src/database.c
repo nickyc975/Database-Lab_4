@@ -255,17 +255,18 @@ int nest_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 
 int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 {
-    int count = 0, R_key = 0, S_key = 0;
-    int R_blk_offset, S_blk_offset;
-    block_t *R_blk = NULL, *S_blk = NULL;
+    int count = 0;
 
-    addr_t R_value, S_value;
-    addr_t R_blk_addr, S_blk_addr, R_curr_blk_addr = 0, S_curr_blk_addr = 0;
-    value_blk_iter_t *R_value_iter, *S_value_iter;
-
-    block_t *blk_buf = new_blk();
+    int R_key = 0, S_key = 0;
     key_iter_t *R_iter = new_key_iter(&(R_db->bptree_meta));
     key_iter_t *S_iter = new_key_iter(&(S_db->bptree_meta));
+
+    addr_t R_curr_blk_addr = 0, S_curr_blk_addr = 0;
+    block_t *R_blk = NULL, *S_blk = NULL, *blk_buf = new_blk();
+
+    int R_blk_offset, S_blk_offset;
+    addr_t R_value, R_blk_addr, S_value, S_blk_addr;
+    value_blk_iter_t *R_value_iter = NULL, *S_value_iter = NULL;
 
     while(has_next_key(R_iter) || has_next_key(S_iter))
     {
@@ -293,7 +294,6 @@ int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
         }
         
         R_value_iter = new_value_blk_iter(curr_blk_addr(R_iter));
-        S_value_iter = new_value_blk_iter(curr_blk_addr(S_iter));
         while (has_next_value(R_value_iter))
         {
             R_value = next_value(R_value_iter);
@@ -310,6 +310,7 @@ int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
                 R_curr_blk_addr = R_blk_addr;
             }
 
+            S_value_iter = new_value_blk_iter(curr_blk_addr(S_iter));
             while (has_next_value(S_value_iter))
             {
                 S_value = next_value(S_value_iter);
@@ -334,9 +335,8 @@ int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
                     base_addr
                 );
             }
-            reset_value_blk_iter(S_value_iter);
+            free_value_blk_iter(S_value_iter);
         }
-        free_value_blk_iter(S_value_iter);
         free_value_blk_iter(R_value_iter);
     }
 
@@ -361,13 +361,18 @@ int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 {
     int count = 0;
-    block_t *R_blk, *S_blk;
-    bukt_iter_t *R_bukt_iter, *S_bukt_iter;
-    block_t *blk_buf = new_blk();
+
+    addr_t R_blk_addr = R_db->head_blk_addr;
+    addr_t S_blk_addr = S_db->head_blk_addr;
     hashbukt_t *R_hashbukt = new_hashbukt(HASHBUKT_NUM, &_hash);
     hashbukt_t *S_hashbukt = new_hashbukt(HASHBUKT_NUM, &_hash);
-    addr_t R_blk_addr = R_db->head_blk_addr, R_curr_blk_addr = 0;
-    addr_t S_blk_addr = S_db->head_blk_addr, S_curr_blk_addr = 0;
+
+    block_t *R_blk, *S_blk, *blk_buf = new_blk();
+    addr_t R_curr_blk_addr = 0, S_curr_blk_addr = 0;
+
+    addr_t R_value, S_value;
+    int R_blk_offset, S_blk_offset;
+    bukt_iter_t *R_bukt_iter, *S_bukt_iter;
 
     while (R_blk_addr)
     {
@@ -398,9 +403,9 @@ int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
         while (bukt_has_next(R_bukt_iter))
         {
             bukt_next(R_bukt_iter);
-            addr_t R_value = bukt_curr_value(R_bukt_iter);
-            addr_t R_blk_addr = get_blk_addr(R_value);
-            int R_blk_offset = get_blk_offset(R_value);
+            R_value = bukt_curr_value(R_bukt_iter);
+            R_blk_addr = get_blk_addr(R_value);
+            R_blk_offset = get_blk_offset(R_value);
 
             if (R_blk_addr != R_curr_blk_addr)
             {
@@ -416,9 +421,9 @@ int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
             while (bukt_has_next(S_bukt_iter))
             {
                 bukt_next(S_bukt_iter);
-                addr_t S_value = bukt_curr_value(S_bukt_iter);
-                addr_t S_blk_addr = get_blk_addr(S_value);
-                int S_blk_offset = get_blk_offset(S_value);
+                S_value = bukt_curr_value(S_bukt_iter);
+                S_blk_addr = get_blk_addr(S_value);
+                S_blk_offset = get_blk_offset(S_value);
 
                 if (S_blk_addr != S_curr_blk_addr)
                 {

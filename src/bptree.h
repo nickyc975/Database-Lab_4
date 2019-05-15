@@ -74,8 +74,6 @@ void free_node(node_t *node);
 
 value_blk_iter_t *new_value_blk_iter(addr_t addr);
 
-void reset_value_blk_iter(value_blk_iter_t *iter);
-
 int has_next_value(value_blk_iter_t *iter);
 
 addr_t next_value(value_blk_iter_t *iter);

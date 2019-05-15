@@ -357,21 +357,6 @@ value_blk_iter_t *new_value_blk_iter(addr_t addr)
     return NULL;
 }
 
-inline void reset_value_blk_iter(value_blk_iter_t *iter)
-{
-    if (iter->curr_blk)
-    {
-        free_value_blk(iter->curr_blk);
-    }
-    iter->curr_blk = read_value_blk(iter->init_addr);
-    if (!iter->curr_blk)
-    {
-        printf("Invalid node addr %d\n", iter->init_addr);
-        exit(1);
-    }
-    iter->value_cursor = 0;
-}
-
 inline int has_next_value(value_blk_iter_t *iter)
 {
     return iter->value_cursor < iter->curr_blk->value_num || iter->curr_blk->next_blk_addr != 0;
