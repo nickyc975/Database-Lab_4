@@ -78,34 +78,6 @@ bukt_iter_t *hashbukt_bukt_at(hashbukt_t *hashbukt, int index)
     exit(1);
 }
 
-int bukt_has_next(bukt_iter_t *iter)
-{
-    return iter->next_bukt != NULL;
-}
-
-void bukt_next(bukt_iter_t *iter)
-{
-    if (iter->next_bukt)
-    {
-        iter->curr_key = iter->next_bukt->key;
-        iter->curr_value = iter->next_bukt->value;
-        iter->next_bukt = iter->next_bukt->next_bukt;
-        return;
-    }
-    printf("no more buckets!\n");
-    exit(1);
-}
-
-int bukt_curr_key(bukt_iter_t *iter)
-{
-    return iter->curr_key;
-}
-
-addr_t bukt_curr_value(bukt_iter_t *iter)
-{
-    return iter->curr_value;
-}
-
 void free_hashbukt(hashbukt_t *hashbukt)
 {
     if (hashbukt)
@@ -129,7 +101,35 @@ void free_hashbukt(hashbukt_t *hashbukt)
     }
 }
 
-void free_bukt_iter(bukt_iter_t *iter)
+inline int bukt_has_next(bukt_iter_t *iter)
+{
+    return iter->next_bukt != NULL;
+}
+
+inline void bukt_next(bukt_iter_t *iter)
+{
+    if (iter->next_bukt)
+    {
+        iter->curr_key = iter->next_bukt->key;
+        iter->curr_value = iter->next_bukt->value;
+        iter->next_bukt = iter->next_bukt->next_bukt;
+        return;
+    }
+    printf("no more buckets!\n");
+    exit(1);
+}
+
+inline int bukt_curr_key(bukt_iter_t *iter)
+{
+    return iter->curr_key;
+}
+
+inline addr_t bukt_curr_value(bukt_iter_t *iter)
+{
+    return iter->curr_value;
+}
+
+inline void free_bukt_iter(bukt_iter_t *iter)
 {
     if (iter)
     {

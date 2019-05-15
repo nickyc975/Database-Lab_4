@@ -8,27 +8,26 @@
 
 int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_addr);
 
-int hash(int key)
-{
-    return key - 1;
-}
+addr_t _join_tuples(Buffer *buffer, block_t *blk_buf, R *R_tuple, S *S_tuple, addr_t base_addr);
 
-addr_t next_blk_addr(addr_t addr)
+int _hash(int key);
+
+inline addr_t next_blk_addr(addr_t addr)
 {
     return (addr & (~0x7)) + 0x8;
 }
 
-addr_t get_blk_addr(addr_t addr)
+inline addr_t get_blk_addr(addr_t addr)
 {
     return addr & (~0x7);
 }
 
-addr_t get_blk_offset(addr_t addr)
+inline addr_t get_blk_offset(addr_t addr)
 {
     return addr & 0x7;
 }
 
-block_t *new_blk(Buffer *buffer)
+inline block_t *new_blk(Buffer *buffer)
 {
     block_t *block = (block_t *)getNewBlockInBuffer(buffer);
     block->tuple_num = 0;
@@ -36,12 +35,12 @@ block_t *new_blk(Buffer *buffer)
     return block;
 }
 
-block_t *read_blk(Buffer *buffer, addr_t blk_addr)
+inline block_t *read_blk(Buffer *buffer, addr_t blk_addr)
 {
     return (block_t *)readBlockFromDisk(blk_addr, buffer);
 }
 
-int save_blk(Buffer *buffer, block_t *block, addr_t blk_addr, int free_after_save)
+inline int save_blk(Buffer *buffer, block_t *block, addr_t blk_addr, int free_after_save)
 {
     int result = writeBlockToDisk((unsigned char *)block, blk_addr, buffer);
     if (free_after_save)
@@ -51,7 +50,7 @@ int save_blk(Buffer *buffer, block_t *block, addr_t blk_addr, int free_after_sav
     return result;
 }
 
-void free_blk(Buffer *buffer, block_t *block)
+inline void free_blk(Buffer *buffer, block_t *block)
 {
     freeBlockInBuffer((unsigned char *)block, buffer);
 }
@@ -256,9 +255,13 @@ int nest_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
 {
     int count = 0, R_key = 0, S_key = 0;
-    block_t *R_curr_blk = NULL, *S_curr_blk = NULL;
-    addr_t R_curr_blk_addr = 0, S_curr_blk_addr = 0;
-    addr_t R_value_blk_addr, S_value_blk_addr;
+    int R_blk_offset, S_blk_offset;
+    block_t *R_blk = NULL, *S_blk = NULL;
+
+    addr_t R_value, S_value;
+    addr_t R_blk_addr, S_blk_addr, R_curr_blk_addr = 0, S_curr_blk_addr = 0;
+    value_blk_iter_t *R_value_iter, *S_value_iter;
+
     block_t *blk_buf = new_blk(R_db->buffer);
     key_iter_t *R_iter = new_key_iter(&(R_db->bptree_meta), R_db->buffer);
     key_iter_t *S_iter = new_key_iter(&(S_db->bptree_meta), S_db->buffer);
@@ -283,83 +286,67 @@ int sort_merge_join(database_t *R_db, database_t *S_db, addr_t base_addr)
             break;
         }
 
-        if (R_key == S_key)
+        if (R_key != S_key)
         {
-            R_value_blk_addr = curr_blk_addr(R_iter);
-            S_value_blk_addr = curr_blk_addr(S_iter);
-            value_blk_iter_t *R_value_iter = new_value_blk_iter(R_value_blk_addr, R_db->buffer);
-
-            while (has_next_value(R_value_iter))
-            {
-                block_t *R_blk;
-                addr_t R_value = next_value(R_value_iter);
-                addr_t R_blk_addr = get_blk_addr(R_value);
-                int R_blk_offset = get_blk_offset(R_value);
-
-                if (R_blk_addr == R_curr_blk_addr)
-                {
-                    R_blk = R_curr_blk;
-                }
-                else
-                {
-                    R_blk = read_blk(R_db->buffer, R_blk_addr);
-                    if (R_curr_blk)
-                    {
-                        free_blk(R_db->buffer, R_curr_blk);
-                    }
-                    R_curr_blk_addr = R_blk_addr;
-                    R_curr_blk = R_blk;
-                }
-                
-                 value_blk_iter_t *S_value_iter = new_value_blk_iter(S_value_blk_addr, S_db->buffer);
-                 while (has_next_value(S_value_iter))
-                 {
-                    block_t *S_blk;
-                    addr_t S_value = next_value(S_value_iter);
-                    addr_t S_blk_addr = get_blk_addr(S_value);
-                    int S_blk_offset = get_blk_offset(S_value);
-
-                    if (S_blk_addr == S_curr_blk_addr)
-                    {
-                        S_blk = S_curr_blk;
-                    }
-                    else
-                    {
-                        S_blk = read_blk(S_db->buffer, S_blk_addr);
-                        if (S_curr_blk)
-                    {
-                        free_blk(S_db->buffer, S_curr_blk);
-                    }
-                        S_curr_blk_addr = S_blk_addr;
-                        S_curr_blk = S_blk;
-                    }
-
-                    blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = R_blk->R_tuples[R_blk_offset];
-                    blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = S_blk->S_tuples[S_blk_offset];
-                    blk_buf->tuple_num++;
-                    count++;
-                    if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
-                    {
-                        base_addr++;
-                        blk_buf->next_blk = base_addr;
-                        save_blk(R_db->buffer, blk_buf, base_addr - 1, 0);
-                        blk_buf->tuple_num = 0;
-                    }
-                 }
-                 free_value_blk_iter(S_value_iter);
-            }
-            free_value_blk_iter(R_value_iter);
+            continue;
         }
+        
+        R_value_iter = new_value_blk_iter(curr_blk_addr(R_iter), R_db->buffer);
+        S_value_iter = new_value_blk_iter(curr_blk_addr(S_iter), S_db->buffer);
+        while (has_next_value(R_value_iter))
+        {
+            R_value = next_value(R_value_iter);
+            R_blk_addr = get_blk_addr(R_value);
+            R_blk_offset = get_blk_offset(R_value);
+
+            if (R_blk_addr != R_curr_blk_addr)
+            {
+                if (R_blk)
+                {
+                    free_blk(R_db->buffer, R_blk);
+                }
+                R_blk = read_blk(R_db->buffer, R_blk_addr);
+                R_curr_blk_addr = R_blk_addr;
+            }
+
+            while (has_next_value(S_value_iter))
+            {
+                S_value = next_value(S_value_iter);
+                S_blk_addr = get_blk_addr(S_value);
+                S_blk_offset = get_blk_offset(S_value);
+
+                if (S_blk_addr != S_curr_blk_addr)
+                {
+                    if (S_blk)
+                    {
+                        free_blk(S_db->buffer, S_blk);
+                    }
+                    S_blk = read_blk(S_db->buffer, S_blk_addr);
+                    S_curr_blk_addr = S_blk_addr;
+                }
+
+                count++;
+                base_addr = _join_tuples(
+                    R_db->buffer, blk_buf, 
+                    &(R_blk->R_tuples[R_blk_offset]), 
+                    &(S_blk->S_tuples[S_blk_offset]), 
+                    base_addr
+                );
+            }
+            reset_value_blk_iter(S_value_iter);
+        }
+        free_value_blk_iter(S_value_iter);
+        free_value_blk_iter(R_value_iter);
     }
 
-    if (R_curr_blk)
+    if (R_blk)
     {
-        free_blk(R_db->buffer, R_curr_blk);
+        free_blk(R_db->buffer, R_blk);
     }
 
-    if (S_curr_blk)
+    if (S_blk)
     {
-        free_blk(S_db->buffer, S_curr_blk);
+        free_blk(S_db->buffer, S_blk);
     }
 
     free_key_iter(R_iter);
@@ -376,8 +363,8 @@ int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
     block_t *R_blk, *S_blk;
     bukt_iter_t *R_bukt_iter, *S_bukt_iter;
     block_t *blk_buf = new_blk(R_db->buffer);
-    hashbukt_t *R_hashbukt = new_hashbukt(HASHBUKT_NUM, &hash);
-    hashbukt_t *S_hashbukt = new_hashbukt(HASHBUKT_NUM, &hash);
+    hashbukt_t *R_hashbukt = new_hashbukt(HASHBUKT_NUM, &_hash);
+    hashbukt_t *S_hashbukt = new_hashbukt(HASHBUKT_NUM, &_hash);
     addr_t R_blk_addr = R_db->head_blk_addr, R_curr_blk_addr = 0;
     addr_t S_blk_addr = S_db->head_blk_addr, S_curr_blk_addr = 0;
 
@@ -442,17 +429,13 @@ int hash_join(database_t *R_db, database_t *S_db, addr_t base_addr)
                     S_curr_blk_addr = S_blk_addr;
                 }
 
-                blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = R_blk->R_tuples[R_blk_offset];
-                blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = S_blk->S_tuples[S_blk_offset];
-                blk_buf->tuple_num++;
                 count++;
-                if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
-                {
-                    base_addr++;
-                    blk_buf->next_blk = base_addr;
-                    save_blk(R_db->buffer, blk_buf, base_addr - 1, 0);
-                    blk_buf->tuple_num = 0;
-                }
+                base_addr = _join_tuples(
+                    R_db->buffer, blk_buf, 
+                    &(R_blk->R_tuples[R_blk_offset]), 
+                    &(S_blk->S_tuples[S_blk_offset]), 
+                    base_addr
+                );
             }
             free_bukt_iter(S_bukt_iter);
         }
@@ -543,4 +526,24 @@ int _read_value_blks(database_t *database, addr_t value_blk_addr, addr_t base_ad
     blk_buf->next_blk = 0;
     save_blk(database->buffer, blk_buf, base_addr, 1);
     return count;
+}
+
+inline addr_t _join_tuples(Buffer *buffer, block_t *blk_buf, R *R_tuple, S *S_tuple, addr_t base_addr)
+{
+    blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = *R_tuple;
+    blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = *S_tuple;
+    blk_buf->tuple_num++;
+    if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
+    {
+        base_addr++;
+        blk_buf->next_blk = base_addr;
+        save_blk(buffer, blk_buf, base_addr - 1, 0);
+        blk_buf->tuple_num = 0;
+    }
+    return base_addr;
+}
+
+inline int _hash(int key)
+{
+    return key - 1;
 }

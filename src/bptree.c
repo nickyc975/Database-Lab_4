@@ -42,6 +42,7 @@ struct key_iter_struct
 struct value_blk_iter_struct
 {
     Buffer *buffer;
+    addr_t init_addr;
     value_blk_t *curr_blk;
     unsigned int value_cursor;
 };
@@ -230,12 +231,12 @@ key_iter_t *new_key_iter(bptree_meta_t *meta, Buffer *buffer)
     return NULL;
 }
 
-int has_next_key(key_iter_t *iter)
+inline int has_next_key(key_iter_t *iter)
 {
     return iter->key_cursor < iter->curr_node->key_num || iter->curr_node->next_node != 0;
 }
 
-int next_key(key_iter_t *iter)
+inline int next_key(key_iter_t *iter)
 {
     int result = 0;
     if (iter->key_cursor < iter->curr_node->key_num)
@@ -266,7 +267,7 @@ int next_key(key_iter_t *iter)
     return result;
 }
 
-addr_t curr_blk_addr(key_iter_t *iter)
+inline addr_t curr_blk_addr(key_iter_t *iter)
 {
     return iter->curr_node->blk_addrs[iter->key_cursor - 1];
 }
@@ -283,12 +284,12 @@ void free_key_iter(key_iter_t *iter)
     }
 }
 
-node_t *read_node(bptree_t *bptree, addr_t addr)
+inline node_t *read_node(bptree_t *bptree, addr_t addr)
 {
     return (node_t *)readBlockFromDisk(addr, bptree->buffer);
 }
 
-addr_t node_get(node_t *node, int key)
+inline addr_t node_get(node_t *node, int key)
 {
     if (node && node->type == LEAF)
     {
@@ -303,7 +304,7 @@ addr_t node_get(node_t *node, int key)
     return 0;
 }
 
-int node_maxkey(node_t *node)
+inline int node_maxkey(node_t *node)
 {
     if (node && node->type == LEAF)
     {
@@ -312,7 +313,7 @@ int node_maxkey(node_t *node)
     return INT_MAX;
 }
 
-int node_minkey(node_t *node)
+inline int node_minkey(node_t *node)
 {
     if (node && node->type == LEAF)
     {
@@ -321,7 +322,7 @@ int node_minkey(node_t *node)
     return INT_MIN;
 }
 
-addr_t node_next_node(node_t *node)
+inline addr_t node_next_node(node_t *node)
 {
     if (node && node->type == LEAF)
     {
@@ -330,12 +331,12 @@ addr_t node_next_node(node_t *node)
     return 0;
 }
 
-void free_node(bptree_t *bptree, node_t *node)
+inline void free_node(bptree_t *bptree, node_t *node)
 {
     freeBlockInBuffer((unsigned char *)node, bptree->buffer);
 }
 
-value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr)
+inline value_blk_t *read_value_blk(bptree_t *bptree, addr_t blk_addr)
 {
     return (value_blk_t *)readBlockFromDisk(blk_addr, bptree->buffer);
 }
@@ -348,6 +349,7 @@ value_blk_iter_t *new_value_blk_iter(addr_t addr, Buffer *buffer)
         value_blk_iter_t *iter = (value_blk_iter_t *)malloc(sizeof(value_blk_iter_t));
 
         iter->buffer = buffer;
+        iter->init_addr = addr;
         iter->curr_blk = read_value_blk(bptree, addr);
         if (!iter->curr_blk)
         {
@@ -361,12 +363,28 @@ value_blk_iter_t *new_value_blk_iter(addr_t addr, Buffer *buffer)
     return NULL;
 }
 
-int has_next_value(value_blk_iter_t *iter)
+inline void reset_value_blk_iter(value_blk_iter_t *iter)
+{
+    bptree_t *bptree = &(bptree_t){.buffer = iter->buffer};
+    if (iter->curr_blk)
+    {
+        free_value_blk(bptree, iter->curr_blk);
+    }
+    iter->curr_blk = read_value_blk(bptree, iter->init_addr);
+    if (!iter->curr_blk)
+    {
+        printf("Invalid node addr %d\n", iter->init_addr);
+        exit(1);
+    }
+    iter->value_cursor = 0;
+}
+
+inline int has_next_value(value_blk_iter_t *iter)
 {
     return iter->value_cursor < iter->curr_blk->value_num || iter->curr_blk->next_blk_addr != 0;
 }
 
-addr_t next_value(value_blk_iter_t *iter)
+inline addr_t next_value(value_blk_iter_t *iter)
 {
     addr_t result = 0;
     if (iter->value_cursor < iter->curr_blk->value_num)
@@ -409,18 +427,18 @@ void free_value_blk_iter(value_blk_iter_t *iter)
     }
 }
 
-void free_value_blk(bptree_t *bptree, value_blk_t *value_blk)
+inline void free_value_blk(bptree_t *bptree, value_blk_t *value_blk)
 {
     freeBlockInBuffer((unsigned char *)value_blk, bptree->buffer);
 }
 
-addr_t _next_addr(bptree_t *bptree)
+inline addr_t _next_addr(bptree_t *bptree)
 {
     bptree->last_alloc_addr += sizeof(node_t);
     return bptree->last_alloc_addr;
 }
 
-node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
+inline node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = (node_t *)getNewBlockInBuffer(bptree->buffer);
     node->key_num = 0;
@@ -428,14 +446,14 @@ node_t *_new_node(bptree_t *bptree, addr_t addr, addr_t parent)
     return node;
 }
 
-node_t *_new_inner(bptree_t *bptree, addr_t addr, addr_t parent)
+inline node_t *_new_inner(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = _new_node(bptree, addr, parent);
     node->type = INNER;
     return node;
 }
 
-node_t *_new_leaf(bptree_t *bptree, addr_t addr, addr_t parent)
+inline node_t *_new_leaf(bptree_t *bptree, addr_t addr, addr_t parent)
 {
     node_t *node = _new_node(bptree, addr, parent);
     node->type = LEAF;
@@ -443,7 +461,7 @@ node_t *_new_leaf(bptree_t *bptree, addr_t addr, addr_t parent)
     return node;
 }
 
-int _save_node(bptree_t *bptree, node_t *node, int free_after_save)
+inline int _save_node(bptree_t *bptree, node_t *node, int free_after_save)
 {
     int result = writeBlockToDisk((unsigned char *)node, node->addr, bptree->buffer);
     if (free_after_save)
@@ -453,7 +471,7 @@ int _save_node(bptree_t *bptree, node_t *node, int free_after_save)
     return result;
 }
 
-value_blk_t *_new_value_blk(bptree_t *bptree)
+inline value_blk_t *_new_value_blk(bptree_t *bptree)
 {
     value_blk_t *value_blk = (value_blk_t *)getNewBlockInBuffer(bptree->buffer);
     value_blk->value_num = 0;
@@ -462,7 +480,7 @@ value_blk_t *_new_value_blk(bptree_t *bptree)
     return value_blk;
 }
 
-int _save_value_blk(bptree_t *bptree, value_blk_t *value_blk, int free_after_save)
+inline int _save_value_blk(bptree_t *bptree, value_blk_t *value_blk, int free_after_save)
 {
     int result = writeBlockToDisk((unsigned char *)value_blk, value_blk->blk_addr, bptree->buffer);
     if (free_after_save)
@@ -589,7 +607,7 @@ void _insert_into_leaf(bptree_t *bptree, node_t *node, int key, addr_t value)
     }
 }
 
-int _copy_inner(node_t *src, node_t *dest, unsigned int start)
+inline int _copy_inner(node_t *src, node_t *dest, unsigned int start)
 {
     unsigned int cursor = start;
     while (cursor < src->key_num && dest->key_num < MAX_KEY_NUM)
@@ -602,7 +620,7 @@ int _copy_inner(node_t *src, node_t *dest, unsigned int start)
     return cursor - start;
 }
 
-int _copy_leaf(node_t *src, node_t *dest, unsigned int start)
+inline int _copy_leaf(node_t *src, node_t *dest, unsigned int start)
 {
     unsigned int cursor = start;
     while (cursor < src->key_num && dest->key_num < MAX_KEY_NUM)

@@ -5,8 +5,8 @@
 #include "database.h"
 #include "../lib/libextmem.h"
 
-#define R_BLK_NUM 16
-#define S_BLK_NUM 32
+#define R_BLK_NUM 512
+#define S_BLK_NUM 1024
 #define R_HEAD_BLK_ADDR 0x520000
 #define S_HEAD_BLK_ADDR 0x530000
 #define R_BPTREE_ROOT_ADDR 0x52000000
@@ -40,53 +40,65 @@ int main(int argc, char *argv[])
     S_db.bptree_meta.last_alloc_addr = S_BPTREE_ROOT_ADDR;
 
     int count;
+    time_t now;
     unsigned long io_num;
     srand((unsigned int)time(NULL));
     gen_blocks(buffer, &R_db, &S_db);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = linear_search(&R_db, 40, 0x5200);
-    printf("linear search in R found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("linear search in R found %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = linear_search(&S_db, 60, 0x5300);
-    printf("linear search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("linear search in S found %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = binary_search(&R_db, 40, 0x6200);
-    printf("binary search in R found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("binary search in R found %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = binary_search(&S_db, 60, 0x6300);
-    printf("binary search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("binary search in S found %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = index_search(&R_db, 40, 0x7200);
-    printf("index search in R found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("index search in R found %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = index_search(&S_db, 60, 0x7300);
-    printf("index search in S found %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("index search in S found %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = project(&R_db, 0x8200);
-    printf("project from R to A created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("project from R to A created %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = project(&S_db, 0x8300);
-    printf("project from S to C created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("project from S to C created %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = nest_loop_join(&R_db, &S_db, 0x9500);
-    printf("nest loop join R and S created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("nest loop join R and S created %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = sort_merge_join(&R_db, &S_db, 0xA500);
-    printf("sort merge join R and S created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("sort merge join R and S created %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
+    now = time(NULL);
     io_num = buffer->numIO;
     count = hash_join(&R_db, &S_db, 0xB500);
-    printf("hash join R and S created %d tuples, io cost: %ld\n", count, buffer->numIO - io_num);
+    printf("hash join R and S created %d tuples, io cost: %ld, time cost: %lu\n", count, buffer->numIO - io_num, time(NULL) - now);
 
     printf("numFreeBlk: %ld\n", buffer->numFreeBlk);
 
