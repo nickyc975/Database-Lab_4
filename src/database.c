@@ -213,17 +213,13 @@ int nest_loop_join(database_t *R_db, database_t *S_db, addr_t base_addr)
                     {
                         if (R_blk->R_tuples[j].key == S_blks[i]->S_tuples[k].key)
                         {
-                            blk_buf->joined_tuples[blk_buf->tuple_num].R_tuple = R_blk->R_tuples[j];
-                            blk_buf->joined_tuples[blk_buf->tuple_num].S_tuple = S_blks[i]->S_tuples[k];
-                            blk_buf->tuple_num++;
                             count++;
-                            if (blk_buf->tuple_num >= TUPLES_PER_BLK / 2)
-                            {
-                                base_addr++;
-                                blk_buf->next_blk = base_addr;
-                                save_blk(blk_buf, base_addr - 1, 0);
-                                blk_buf->tuple_num = 0;
-                            }
+                            base_addr = _join_tuples(
+                                blk_buf,
+                                &(R_blk->R_tuples[j]),
+                                &(S_blks[i]->S_tuples[k]),
+                                base_addr
+                            );
                         }
                     }
                 }
